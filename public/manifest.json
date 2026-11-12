@@ -1,0 +1,33 @@
+{
+  "name": "آزمـیار | مرجع آموزشی آزمایش‌های آزمایشگاهی",
+  "short_name": "آزمـیار",
+  "description": "اپلیکیشن آموزشی آزمایش‌های آزمایشگاهی برای دانشجویان و کادر درمان با دسته‌بندی موضوعی، جعبه لایتنر و آزمون",
+  "dir": "rtl",
+  "lang": "fa",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0d6860",
+  "theme_color": "#0f9488",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
