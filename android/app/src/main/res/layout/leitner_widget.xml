@@ -6,7 +6,7 @@
     android:layoutDirection="rtl"
     android:orientation="vertical"
     android:background="@drawable/widget_bg"
-    android:padding="12dp">
+    android:padding="14dp">
 
     <!-- header -->
     <LinearLayout
@@ -29,7 +29,7 @@
             android:layout_marginStart="7dp"
             android:text="جعبه لایتنر"
             android:textColor="#FFFFFF"
-            android:textSize="14sp"
+            android:textSize="17sp"
             android:textStyle="bold" />
 
         <TextView
@@ -40,10 +40,10 @@
             android:background="@drawable/widget_chip"
             android:paddingLeft="9dp"
             android:paddingRight="9dp"
-            android:paddingTop="2dp"
-            android:paddingBottom="2dp"
+            android:paddingTop="3dp"
+            android:paddingBottom="3dp"
             android:textColor="#FFFFFF"
-            android:textSize="11sp"
+            android:textSize="13sp"
             android:textStyle="bold" />
     </LinearLayout>
 
@@ -56,10 +56,10 @@
         android:layout_weight="1"
         android:ellipsize="end"
         android:gravity="right"
-        android:maxLines="6"
+        android:maxLines="5"
         android:textColor="#FFFFFF"
-        android:textSize="13sp"
-        android:lineSpacingExtra="2dp" />
+        android:textSize="16sp"
+        android:lineSpacingExtra="3dp" />
 
     <!-- answer (hidden until flipped) -->
     <TextView
@@ -71,12 +71,12 @@
         android:visibility="gone"
         android:ellipsize="end"
         android:gravity="right"
-        android:maxLines="5"
+        android:maxLines="4"
         android:textColor="#E7FBF6"
-        android:textSize="12sp"
-        android:lineSpacingExtra="2dp"
+        android:textSize="15sp"
+        android:lineSpacingExtra="3dp"
         android:background="@drawable/widget_answer_box"
-        android:padding="8dp" />
+        android:padding="10dp" />
 
     <!-- actions -->
     <LinearLayout
@@ -88,7 +88,7 @@
         <TextView
             android:id="@+id/w_btn_flip"
             android:layout_width="0dp"
-            android:layout_height="38dp"
+            android:layout_height="46dp"
             android:layout_weight="1"
             android:background="@drawable/widget_button"
             android:clickable="true"
@@ -96,13 +96,13 @@
             android:gravity="center"
             android:text="نمایش پاسخ"
             android:textColor="#0B4640"
-            android:textSize="13sp"
+            android:textSize="15sp"
             android:textStyle="bold" />
 
         <TextView
             android:id="@+id/w_btn_good"
             android:layout_width="0dp"
-            android:layout_height="38dp"
+            android:layout_height="46dp"
             android:layout_weight="1"
             android:visibility="gone"
             android:layout_marginStart="6dp"
@@ -112,13 +112,13 @@
             android:gravity="center"
             android:text="بلدم"
             android:textColor="#14532D"
-            android:textSize="13sp"
+            android:textSize="15sp"
             android:textStyle="bold" />
 
         <TextView
             android:id="@+id/w_btn_bad"
             android:layout_width="0dp"
-            android:layout_height="38dp"
+            android:layout_height="46dp"
             android:layout_weight="1"
             android:visibility="gone"
             android:layout_marginStart="6dp"
@@ -128,7 +128,7 @@
             android:gravity="center"
             android:text="نمی‌دانم"
             android:textColor="#7F1D1D"
-            android:textSize="13sp"
+            android:textSize="15sp"
             android:textStyle="bold" />
     </LinearLayout>
 
@@ -141,7 +141,7 @@
         android:visibility="gone"
         android:text="برای دیدن کارت‌های بعدی، فردا سر بزنید."
         android:textColor="#D6F4EE"
-        android:textSize="11sp" />
+        android:textSize="13sp" />
 
     <!-- footer -->
     <TextView
@@ -150,5 +150,5 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="6dp"
         android:textColor="#B8E8E0"
-        android:textSize="10sp" />
+        android:textSize="12sp" />
 </LinearLayout>

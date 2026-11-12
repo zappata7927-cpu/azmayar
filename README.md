@@ -53,7 +53,7 @@
 
 نسخه اندروید اپ با **Capacitor 7** ساخته می‌شود و به‌صورت خودکار با GitHub Actions کامپایل و منتشر می‌شود:
 
-- **دانلود آخرین نسخه APK:** `https://github.com/<نام‌کاربری>/<نام‌مخزن>/releases/download/latest-apk/Azmayar-v1.1.0.apk`
+- **دانلود آخرین نسخه APK:** `https://github.com/<نام‌کاربری>/<نام‌مخزن>/releases/download/latest-apk/Azmayar-v1.2.0.apk`
 - **صفحه ریلیزها:** `https://github.com/<نام‌کاربری>/<نام‌مخزن>/releases` (ریلیز «latest-apk» همیشه آخرین نسخه را دارد)
 - **آرتیفکت هر اجرا:** تب **Actions** ← اجرای «Build Android APK» ← artifacts
 

@@ -2,7 +2,7 @@
 <resources>
     <string name="app_name">آزمـیار</string>
     <string name="title_activity_main">آزمـیار</string>
-    <string name="package_name">ir.azmayar.app</string>
-    <string name="custom_url_scheme">ir.azmayar.app</string>
+    <string name="package_name">mojtaba.app.lab</string>
+    <string name="custom_url_scheme">mojtaba.app.lab</string>
     <string name="widget_description">مرور کارت‌های جعبه لایتنر بدون ورود به اپلیکیشن</string>
 </resources>

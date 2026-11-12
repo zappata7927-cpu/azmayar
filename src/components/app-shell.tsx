@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import {
   Home,
@@ -27,6 +27,16 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
@@ -45,7 +55,8 @@ import { QuizView } from "@/components/views/quiz";
 import { AboutView } from "@/components/views/about";
 import { InterpretView } from "@/components/views/interpret";
 import { ViewErrorBoundary } from "@/components/error-boundary";
-import { initWidgetSync } from "@/lib/widget-bridge";
+import { initWidgetSync, isNativeApp } from "@/lib/widget-bridge";
+import { App } from "@capacitor/app";
 import { cn, faNum } from "@/lib/utils";
 
 // ---------------- Splash ----------------
@@ -295,6 +306,10 @@ export function AppShell() {
   const [installEvt, setInstallEvt] = useState<{ prompt: () => void } | null>(null);
   const [route, navigate] = useRoute();
   const leitner = useAppStore((s) => s.leitner);
+  // Android hardware back: go one step back; when nothing left, ask before exiting
+  const [exitOpen, setExitOpen] = useState(false);
+  const exitOpenRef = useRef(false);
+  exitOpenRef.current = exitOpen;
 
   const onInstall = useCallback((evt: Event) => {
     evt.preventDefault();
@@ -311,9 +326,24 @@ export function AppShell() {
     }
     // Android home-screen widget sync (no-op on web)
     const stopWidgetSync = initWidgetSync();
+    // Android hardware back button: history back, or exit confirmation at the root
+    let backSub: { remove: () => void } | null = null;
+    if (isNativeApp()) {
+      void App.addListener("backButton", ({ canGoBack }) => {
+        if (exitOpenRef.current) {
+          setExitOpen(false); // second back press = cancel dialog
+          return;
+        }
+        if (canGoBack) window.history.back();
+        else setExitOpen(true);
+      }).then((s) => {
+        backSub = s;
+      });
+    }
     return () => {
       window.removeEventListener("beforeinstallprompt", onInstall);
       stopWidgetSync();
+      backSub?.remove();
     };
   }, [onInstall]);
 
@@ -383,6 +413,25 @@ export function AppShell() {
 
       <BottomNav route={route} navigate={navigate} dueBadge={dueBadge} />
       <SearchDialog open={searchOpen} onOpenChange={setSearchOpen} data={data} navigate={navigate} />
+      <AlertDialog open={exitOpen} onOpenChange={setExitOpen}>
+        <AlertDialogContent className="max-w-xs rounded-2xl">
+          <AlertDialogHeader className="items-center text-center">
+            <AlertDialogTitle className="text-base">خروج از آزمـیار</AlertDialogTitle>
+            <AlertDialogDescription className="text-center text-[13px] leading-6">
+              آیا مطمئنید می‌خواهید از برنامه خارج شوید؟
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-row-reverse gap-2 sm:justify-center">
+            <AlertDialogCancel className="mt-0 rounded-xl">ماندن</AlertDialogCancel>
+            <AlertDialogAction
+              className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => void App.exitApp()}
+            >
+              خروج
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <Toaster position="top-center" richColors />
     </div>
   );

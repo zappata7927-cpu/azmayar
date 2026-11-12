@@ -36,10 +36,10 @@ public class LeitnerWidgetProvider extends AppWidgetProvider {
     public static final String KEY_CURRENT = "current_id";
     public static final String KEY_FLIPPED = "flipped";
 
-    public static final String ACTION_FLIP = "ir.azmayar.app.WIDGET_FLIP";
-    public static final String ACTION_GOOD = "ir.azmayar.app.WIDGET_GOOD";
-    public static final String ACTION_BAD = "ir.azmayar.app.WIDGET_BAD";
-    public static final String ACTION_REFRESH = "ir.azmayar.app.WIDGET_REFRESH";
+    public static final String ACTION_FLIP = "mojtaba.app.lab.WIDGET_FLIP";
+    public static final String ACTION_GOOD = "mojtaba.app.lab.WIDGET_GOOD";
+    public static final String ACTION_BAD = "mojtaba.app.lab.WIDGET_BAD";
+    public static final String ACTION_REFRESH = "mojtaba.app.lab.WIDGET_REFRESH";
 
     // Leitner intervals in days for boxes 1..5 (must match the app: BOX_INTERVALS)
     private static final long[] INTERVALS_DAYS = {1, 3, 7, 14, 30};

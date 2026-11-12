@@ -39,10 +39,10 @@
             android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-                <action android:name="ir.azmayar.app.WIDGET_FLIP" />
-                <action android:name="ir.azmayar.app.WIDGET_GOOD" />
-                <action android:name="ir.azmayar.app.WIDGET_BAD" />
-                <action android:name="ir.azmayar.app.WIDGET_REFRESH" />
+                <action android:name="mojtaba.app.lab.WIDGET_FLIP" />
+                <action android:name="mojtaba.app.lab.WIDGET_GOOD" />
+                <action android:name="mojtaba.app.lab.WIDGET_BAD" />
+                <action android:name="mojtaba.app.lab.WIDGET_REFRESH" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
