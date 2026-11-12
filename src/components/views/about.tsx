@@ -2,8 +2,6 @@
 
 import {
   GraduationCap,
-  Smartphone,
-  Download,
   BookMarked,
   ShieldAlert,
   Database,
@@ -34,14 +32,7 @@ const COLLABORATORS = [
   },
 ];
 
-export function AboutView({ data, installEvt }: { data: AppData; installEvt: { prompt: () => void } | null }) {
-  const steps = [
-    "این صفحه را با مرورگر Chrome گوشی اندرویدی خود باز کنید.",
-    "روی آیکون منو (⋮) در بالای مرورگر بزنید.",
-    "گزینه «Add to Home screen» یا «افزودن به صفحه اصلی» را انتخاب کنید.",
-    "نام اپ را تأیید کنید؛ آیکون «آزمـیار» مثل یک اپلیکیشن واقعی روی گوشی شما قرار می‌گیرد و بدون اینترنت هم کار می‌کند.",
-  ];
-
+export function AboutView({ data }: { data: AppData }) {
   return (
     <div className="space-y-5">
       {/* author card */}
@@ -105,34 +96,6 @@ export function AboutView({ data, installEvt }: { data: AppData; installEvt: { p
         </div>
       </section>
 
-      {/* install guide */}
-      <section className="rounded-2xl border bg-card p-4 shadow-sm">
-        <h2 className="mb-3 flex items-center gap-2 text-[15px] font-bold">
-          <Smartphone className="h-4.5 w-4.5 text-primary" /> نصب روی گوشی اندروید
-        </h2>
-        <ol className="space-y-2.5">
-          {steps.map((s, i) => (
-            <li key={i} className="flex items-start gap-2.5 text-sm leading-7 text-foreground/85">
-              <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-primary/10 text-xs font-black text-primary">
-                {faNum(i + 1)}
-              </span>
-              {s}
-            </li>
-          ))}
-        </ol>
-        {installEvt && (
-          <button
-            onClick={() => installEvt.prompt()}
-            className="mt-4 flex min-h-[48px] w-full items-center justify-center gap-2 rounded-2xl bg-primary font-bold text-white"
-          >
-            <Download className="h-5 w-5" /> نصب همین حالا
-          </button>
-        )}
-        <p className="mt-3 rounded-xl bg-muted/60 p-3 text-[11px] leading-5 text-muted-foreground">
-          روی آیفون هم می‌توانید از طریق Safari و گزینه «Add to Home Screen» اپ را نصب کنید.
-        </p>
-      </section>
-
       {/* sources */}
       <section className="rounded-2xl border bg-card p-4 shadow-sm">
         <h2 className="mb-3 flex items-center gap-2 text-[15px] font-bold">
@@ -162,7 +125,7 @@ export function AboutView({ data, installEvt }: { data: AppData; installEvt: { p
       {/* credit footer */}
       <div className="pb-2 text-center text-[11px] leading-6 text-muted-foreground">
         <p className="mt-1">
-          آزمـیار نسخه ۱٫۲ — طراحی و ساخت: {AUTHOR.name}
+          آزمـیار نسخه ۱٫۲٫۱ — طراحی و ساخت: {AUTHOR.name}
         </p>
       </div>
     </div>

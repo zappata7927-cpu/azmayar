@@ -8,6 +8,7 @@ import type { Route } from "@/lib/nav";
 import { useAppStore } from "@/lib/store";
 import { buildQuiz, quizCountsFor, type QuizMode, type QuizSession } from "@/lib/quiz";
 import { faNum, cn } from "@/lib/utils";
+import { tapHaptic } from "@/lib/haptics";
 import { toast } from "sonner";
 
 const OPTION_LETTERS = ["الف", "ب", "ج", "د", "ه", "و"];
@@ -38,6 +39,7 @@ export function QuizView({ data, navigate }: { data: AppData; navigate: (r: Rout
   }, [mistakes, data.questions]);
 
   const startQuiz = (mode: QuizMode) => {
+    void tapHaptic();
     let s: QuizSession;
     try {
       s = buildQuiz(data, mode, count, onlyRead);
@@ -65,6 +67,7 @@ export function QuizView({ data, navigate }: { data: AppData; navigate: (r: Rout
 
   const pick = (idx: number, q: Question) => {
     if (picked !== null) return;
+    void tapHaptic();
     setPicked(idx);
     const ok = idx === (Number.isInteger(q.answer) && Array.isArray(q.options) && q.answer >= 0 && q.answer < q.options.length ? q.answer : 0);
     if (ok) setScore((s) => s + 1);
@@ -283,7 +286,10 @@ export function QuizView({ data, navigate }: { data: AppData; navigate: (r: Rout
           {[5, 10, 20, 40].map((c) => (
             <button
               key={c}
-              onClick={() => setCount(c)}
+              onClick={() => {
+                void tapHaptic();
+                setCount(c);
+              }}
               className={cn(
                 "rounded-xl border py-2.5 text-sm font-bold transition-colors",
                 count === c ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground"

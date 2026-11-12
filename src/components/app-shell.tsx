@@ -12,7 +12,6 @@ import {
   Settings,
   ChevronRight,
   Star,
-  Smartphone,
   RotateCcw,
   X,
   FlaskConical,
@@ -55,7 +54,7 @@ import { QuizView } from "@/components/views/quiz";
 import { AboutView } from "@/components/views/about";
 import { InterpretView } from "@/components/views/interpret";
 import { ViewErrorBoundary } from "@/components/error-boundary";
-import { initWidgetSync, isNativeApp } from "@/lib/widget-bridge";
+import { initWidgetSync, pullWidgetState, isNativeApp } from "@/lib/widget-bridge";
 import { App } from "@capacitor/app";
 import { cn, faNum } from "@/lib/utils";
 
@@ -303,24 +302,19 @@ function SettingsSheet({ data }: { data: AppData }) {
 export function AppShell() {
   const [data, setData] = useState<AppData | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
-  const [installEvt, setInstallEvt] = useState<{ prompt: () => void } | null>(null);
   const [route, navigate] = useRoute();
   const leitner = useAppStore((s) => s.leitner);
   // Android hardware back: go one step back; when nothing left, ask before exiting
   const [exitOpen, setExitOpen] = useState(false);
   const exitOpenRef = useRef(false);
-  exitOpenRef.current = exitOpen;
-
-  const onInstall = useCallback((evt: Event) => {
-    evt.preventDefault();
-    setInstallEvt(evt as unknown as { prompt: () => void });
-  }, []);
+  useEffect(() => {
+    exitOpenRef.current = exitOpen;
+  }, [exitOpen]);
 
   useEffect(() => {
     loadAppData()
       .then(setData)
       .catch(() => setData(null));
-    window.addEventListener("beforeinstallprompt", onInstall);
     if ("serviceWorker" in navigator && !location.hostname.startsWith("localhost") && !location.hostname.startsWith("127.")) {
       navigator.serviceWorker.register(assetUrl("/sw.js")).catch(() => {});
     }
@@ -341,11 +335,15 @@ export function AppShell() {
       });
     }
     return () => {
-      window.removeEventListener("beforeinstallprompt", onInstall);
       stopWidgetSync();
       backSub?.remove();
     };
-  }, [onInstall]);
+  }, []);
+
+  // keep the app in sync with home-screen widget edits on every navigation
+  useEffect(() => {
+    if (isNativeApp()) void pullWidgetState();
+  }, [route]);
 
   const dueBadge = useMemo(() => {
     if (!data) return 0;
@@ -388,26 +386,20 @@ export function AppShell() {
           <Button variant="ghost" size="icon" onClick={() => setSearchOpen(true)} aria-label="جستجو" className="rounded-xl">
             <Search className="h-5 w-5" />
           </Button>
-          {installEvt && (
-            <Button variant="ghost" size="icon" aria-label="نصب اپلیکیشن" className="rounded-xl hidden sm:grid place-items-center"
-              onClick={() => installEvt.prompt()}>
-              <Smartphone className="h-5 w-5" />
-            </Button>
-          )}
           <SettingsSheet data={data} />
         </div>
       </header>
 
       <main className="flex-1 px-3 pb-28 pt-4">
         <ViewErrorBoundary>
-          {route.v === "home" && <HomeView data={data} navigate={navigate} installEvt={installEvt} />}
+          {route.v === "home" && <HomeView data={data} navigate={navigate} />}
           {route.v === "cats" && <CategoriesView data={data} navigate={navigate} />}
           {route.v === "cat" && <CategoryView data={data} cat={route.cat} navigate={navigate} />}
           {route.v === "test" && <TestView data={data} id={route.id} navigate={navigate} />}
           {route.v === "leitner" && <LeitnerView data={data} navigate={navigate} />}
           {route.v === "quiz" && <QuizView data={data} navigate={navigate} />}
           {route.v === "interpret" && <InterpretView data={data} />}
-          {route.v === "about" && <AboutView data={data} installEvt={installEvt} />}
+          {route.v === "about" && <AboutView data={data} />}
         </ViewErrorBoundary>
       </main>
 

@@ -2,6 +2,7 @@
 // On web (browser / PWA) all calls are no-ops.
 
 import { registerPlugin, Capacitor } from "@capacitor/core";
+import { App } from "@capacitor/app";
 import { useAppStore, type LeitnerState } from "./store";
 
 export interface LeitnerBridgePlugin {
@@ -66,7 +67,7 @@ export async function pushWidgetState(): Promise<void> {
   }
 }
 
-/** call once from the app shell: pulls on mount/resume and pushes on any leitner change */
+/** call once from the app shell: pulls on mount/resume/navigation and pushes on any leitner change */
 export function initWidgetSync(): () => void {
   if (!isNativeApp()) return () => {};
 
@@ -74,18 +75,31 @@ export function initWidgetSync(): () => void {
   const unsub = useAppStore.subscribe((state, prev) => {
     if (state.leitner === prev.leitner) return;
     if (timer) clearTimeout(timer);
-    timer = setTimeout(() => void pushWidgetState(), 700);
+    timer = setTimeout(() => void pushWidgetState(), 300);
   });
 
+  // pull widget-side edits whenever the WebView becomes visible again;
+  // flush pending app edits before it pauses (e.g. user switches to home screen)
   const onVisible = () => {
     if (document.visibilityState === "visible") void pullWidgetState();
+    else void pushWidgetState();
   };
   document.addEventListener("visibilitychange", onVisible);
+
+  // native resume/pause event — fires even when visibilitychange is unreliable inside the WebView
+  const appSub = App.addListener("appStateChange", (s) => {
+    if (s.isActive) void pullWidgetState();
+    else void pushWidgetState();
+  });
+
   void pullWidgetState();
 
   return () => {
     unsub();
     document.removeEventListener("visibilitychange", onVisible);
+    void Promise.resolve(appSub)
+      .then((h) => h.remove())
+      .catch(() => {});
     if (timer) clearTimeout(timer);
   };
 }

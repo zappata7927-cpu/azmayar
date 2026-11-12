@@ -8,7 +8,6 @@ import {
   BookOpen,
   Star,
   ChevronLeft,
-  Download,
   Sparkles,
   GraduationCap,
   Lightbulb,
@@ -54,25 +53,6 @@ export const GROUP_COLORS: Record<string, string> = {
   "تجهیزات و تکنیک‌ها": "bg-slate-500",
   "کنترل کیفیت": "bg-emerald-500",
 };
-
-function InstallBanner({ installEvt }: { installEvt: { prompt: () => void } | null }) {
-  if (!installEvt) return null;
-  return (
-    <button
-      onClick={() => installEvt.prompt()}
-      className="flex w-full items-center gap-3 rounded-2xl border border-primary/30 bg-primary/10 p-3.5 text-right transition-transform active:scale-[0.99]"
-    >
-      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary text-white">
-        <Download className="h-5 w-5" />
-      </span>
-      <span className="flex-1">
-        <span className="block text-sm font-bold text-primary">نصب اپلیکیشن روی گوشی</span>
-        <span className="block text-xs text-muted-foreground">برای دسترسی آفلاین، اپ را نصب کنید</span>
-      </span>
-      <ChevronLeft className="h-5 w-5 text-primary" />
-    </button>
-  );
-}
 
 function dayIndex(): number {
   const d = new Date();
@@ -128,10 +108,9 @@ function ClinicalPearl({ data, navigate }: { data: AppData; navigate: (r: Route)
   );
 }
 
-export function HomeView({ data, navigate, installEvt }: {
+export function HomeView({ data, navigate }: {
   data: AppData;
   navigate: (r: Route) => void;
-  installEvt: { prompt: () => void } | null;
 }) {
   const { lastTest, favorites, leitner } = useAppStore();
   const last = useMemo(() => data.tests.find((t) => t.id === lastTest), [data.tests, lastTest]);
@@ -188,8 +167,6 @@ export function HomeView({ data, navigate, installEvt }: {
           </div>
         </div>
       </section>
-
-      <InstallBanner installEvt={installEvt} />
 
       {/* Quick actions */}
       <section className="grid grid-cols-2 gap-3">

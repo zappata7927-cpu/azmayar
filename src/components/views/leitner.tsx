@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Layers,
   Play,
@@ -22,6 +22,8 @@ import { useAppStore, BOX_INTERVALS } from "@/lib/store";
 import { leitnerInfo, buildSession, type SessionCard } from "@/lib/leitner";
 import { faNum } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+import { tapHaptic } from "@/lib/haptics";
+import { pullWidgetState } from "@/lib/widget-bridge";
 
 const BOX_LABELS = ["جدید", "جعبه ۱", "جعبه ۲", "جعبه ۳", "جعبه ۴", "جعبه ۵"];
 
@@ -54,7 +56,13 @@ export function LeitnerView({ data, navigate }: { data: AppData; navigate: (r: R
 
   const info = useMemo(() => leitnerInfo(data, leitner), [data, leitner]);
 
+  // pull widget-side edits so the dashboard always matches the home-screen widget
+  useEffect(() => {
+    void pullWidgetState();
+  }, []);
+
   const start = () => {
+    void tapHaptic();
     const cards = buildSession(data, leitner, settings.dailyCards);
     if (!cards.length) {
       toast.info("در حال حاضر کارتی برای مرور ندارید");
@@ -67,6 +75,7 @@ export function LeitnerView({ data, navigate }: { data: AppData; navigate: (r: R
   };
 
   const answer = (good: boolean) => {
+    void tapHaptic();
     const cur = session![pos];
     answerCard(cur.card.id, good);
     setResults((r) => ({ good: r.good + (good ? 1 : 0), bad: r.bad + (good ? 0 : 1) }));
@@ -113,7 +122,10 @@ export function LeitnerView({ data, navigate }: { data: AppData; navigate: (r: R
             "flip-in cursor-pointer select-none rounded-3xl border-2 bg-card p-6 text-center shadow-lg transition-colors",
             flipped ? "border-primary/50" : "border-border hover:border-primary/30"
           )}
-          onClick={() => setFlipped((f) => !f)}
+          onClick={() => {
+            void tapHaptic();
+            setFlipped((f) => !f);
+          }}
         >
           <div className="mb-3 flex items-center justify-center gap-2 text-[11px] font-bold text-muted-foreground">
             <span className="rounded-lg bg-primary/10 px-2 py-1 text-primary">{cur.card.cat}</span>
@@ -151,7 +163,10 @@ export function LeitnerView({ data, navigate }: { data: AppData; navigate: (r: R
           </div>
         ) : (
           <button
-            onClick={() => setFlipped(true)}
+            onClick={() => {
+              void tapHaptic();
+              setFlipped(true);
+            }}
             className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-primary font-bold text-white transition-transform active:scale-[0.97]"
           >
             <BrainCircuit className="h-5 w-5" /> نمایش پاسخ
