@@ -55,8 +55,25 @@ server.log
 # azmayar build artifacts
 /.next-export/
 /upload/
-/scripts/out/
+/scripts/
+/db/
+/prisma/
+/examples/
+/mini-services/
+/tests/
+/.zscripts/
+/download/
 /db/custom.db
+
+# android / capacitor build artifacts
+android/.gradle/
+android/build/
+android/app/build/
+android/capacitor-cordova-android-plugins/build/
+android/local.properties
+android/.idea/
+*.keystore
+key.properties
 dev.log
 server.log
 Caddyfile

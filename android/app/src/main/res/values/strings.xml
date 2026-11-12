@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">آزمـیار</string>
+    <string name="title_activity_main">آزمـیار</string>
+    <string name="package_name">ir.azmayar.app</string>
+    <string name="custom_url_scheme">ir.azmayar.app</string>
+</resources>

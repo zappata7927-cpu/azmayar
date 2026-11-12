@@ -1,0 +1,8 @@
+{
+  "appId": "ir.azmayar.app",
+  "appName": "آزمـیار",
+  "webDir": ".next-export",
+  "android": {
+    "allowMixedContent": false
+  }
+}

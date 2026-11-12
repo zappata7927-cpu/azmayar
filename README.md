@@ -49,6 +49,27 @@
 
 > **نکته:** اگر نام مخزن را `username.github.io` انتخاب کنید، در فایل `.github/workflows/deploy.yml` خط `NEXT_PUBLIC_BASE_PATH` را حذف کنید تا اپ در ریشه دامنه منتشر شود.
 
+## فایل نصبی اندروید (APK)
+
+نسخه اندروید اپ با **Capacitor 7** ساخته می‌شود و به‌صورت خودکار با GitHub Actions کامپایل و منتشر می‌شود:
+
+- **دانلود آخرین نسخه APK:** `https://github.com/<نام‌کاربری>/<نام‌مخزن>/releases/download/latest-apk/Azmayar-v1.0.0.apk`
+- **صفحه ریلیزها:** `https://github.com/<نام‌کاربری>/<نام‌مخزن>/releases` (ریلیز «latest-apk» همیشه آخرین نسخه را دارد)
+- **آرتیفکت هر اجرا:** تب **Actions** ← اجرای «Build Android APK» ← artifacts
+
+### روش نصب روی گوشی
+
+1. فایل APK را دانلود کنید.
+2. اجرایش کنید و در پیام امنیتی، اجازه «نصب از منابع ناشناس» را بدهید.
+3. تمام! برنامه کاملاً آفلاین کار می‌کند و به هیچ دسترسی حساسی نیاز ندارد.
+
+### جزئیات فنی نسخه اندروید
+
+- پوشه `android/` (قالب Capacitor 7) + `capacitor.config.json` در ریشه پروژه است؛ `webDir` روی `.next-export` تنظیم شده است.
+- ورک‌فلو `build-apk.yml` با هر push روی `main` اجرا می‌شود: ساخت خروجی static بدون basePath ← `cap sync` ← `gradlew assembleRelease` ← انتشار ریلیز.
+- امضای release با keystore انجام می‌شود که از Secret با نام `AZMAYAR_KEYSTORE_BASE64` خوانده می‌شود (اگر مقدار نداشته باشد، به‌طور خودکار با کلید debug امضا می‌شود و باز هم قابل نصب است).
+- آیکون‌های لانچر و صفحات splash در تمام تراکم‌ها از `public/icons/icon-512.png` تولید شده‌اند (اسکریپت `scripts/make_android_assets.py`).
+
 ## اجرای محلی (اختیاری، برای توسعه‌دهندگان)
 
 ```bash
@@ -65,13 +86,13 @@ bun run build:static  # ساخت خروجی استاتیک (پوشه .next-expor
 │   ├── icons/           # آیکون‌های PWA
 │   ├── manifest.json    # تنظیمات نصب اندرویدی
 │   └── sw.js            # سرویس‌ورکر آفلاین
-├── scripts/             # پارسر و مولد داده از فایل Word
 ├── src/
 │   ├── app/             # لایه و صفحه اصلی (SPA با روتهش)
 │   ├── components/      # پوسته اپ، ویوها و رندرکننده بخش‌ها
 │   ├── fonts/           # وزیرمتن
 │   └── lib/             # لایه داده، روتینگ، استور (Zustand)، موتور لایتنر و آزمون
-└── .github/workflows/   # اکشن انتشار خودکار روی GitHub Pages
+├── android/             # پروژه بومی اندروید (Capacitor 7) برای ساخت APK
+└── .github/workflows/   # انتشار Pages (deploy.yml) و ساخت APK (build-apk.yml)
 ```
 
 ## منابع علمی دیتابیس
