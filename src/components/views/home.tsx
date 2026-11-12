@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   FlaskConical,
   Layers,
@@ -11,7 +11,9 @@ import {
   Download,
   Sparkles,
   GraduationCap,
-  ArrowLeft,
+  Lightbulb,
+  Shuffle,
+  ChevronLeft as ArrowLeftIcon,
   Droplets,
   HeartPulse,
   Bug,
@@ -26,7 +28,6 @@ import type { AppData } from "@/lib/types";
 import type { Route } from "@/lib/nav";
 import { useAppStore } from "@/lib/store";
 import { faNum } from "@/lib/utils";
-import { cn } from "@/lib/utils";
 
 export const GROUP_ICONS: Record<string, LucideIcon> = {
   "بیوشیمی خون": FlaskConical,
@@ -73,6 +74,60 @@ function InstallBanner({ installEvt }: { installEvt: { prompt: () => void } | nu
   );
 }
 
+function dayIndex(): number {
+  const d = new Date();
+  return d.getFullYear() * 1000 + d.getMonth() * 40 + d.getDate();
+}
+
+function ClinicalPearl({ data, navigate }: { data: AppData; navigate: (r: Route) => void }) {
+  const pearls = data.pearls ?? [];
+  const [idx, setIdx] = useState(() => (pearls.length ? dayIndex() % pearls.length : 0));
+  if (!pearls.length) return null;
+  const pearl = pearls[idx % pearls.length];
+  const next = () => setIdx((Math.floor(Math.random() * pearls.length * 13) + idx + 1) % pearls.length);
+  return (
+    <section>
+      <div className="relative overflow-hidden rounded-3xl border border-amber-500/25 bg-gradient-to-bl from-amber-400/15 via-orange-300/10 to-amber-100/5 p-4 shadow-sm dark:from-amber-500/10 dark:via-orange-500/8 dark:to-amber-500/5">
+        <div className="absolute -left-8 -top-8 h-24 w-24 rounded-full bg-amber-400/15 blur-2xl" />
+        <div className="relative">
+          <div className="flex items-center gap-2">
+            <span className="grid h-9 w-9 place-items-center rounded-2xl bg-amber-500/15 text-amber-600 dark:text-amber-300">
+              <Lightbulb className="h-4.5 w-4.5" />
+            </span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 text-[13px] font-bold">نکته بالینی</div>
+              <div className="truncate text-[11px] text-muted-foreground">
+                {pearl.cat} • {pearl.test}
+              </div>
+            </div>
+            <span className="mr-auto grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-muted/60 text-amber-600 transition-colors active:scale-95 dark:text-amber-300" onClick={next} aria-label="نکته بعدی" role="button" tabIndex={0} onKeyDown={(e) => e.key === "Enter" && next()}>
+              <Shuffle className="h-4 w-4" />
+            </span>
+          </div>
+          <p className="mt-3 text-[13.5px] leading-8 text-foreground/90 text-justify">{pearl.text}</p>
+          <div className="mt-3 flex items-center gap-2">
+            <button
+              onClick={next}
+              className="flex items-center gap-1.5 rounded-xl bg-amber-500/15 px-3.5 py-2 text-xs font-bold text-amber-700 transition-transform active:scale-95 dark:text-amber-300"
+            >
+              <Shuffle className="h-3.5 w-3.5" /> نکته بعدی
+            </button>
+            {pearl.tid && (
+              <button
+                onClick={() => navigate({ v: "test", id: pearl.tid })}
+                className="flex items-center gap-1.5 rounded-xl border border-amber-500/40 px-3.5 py-2 text-xs font-bold text-amber-700 transition-colors hover:bg-amber-500/10 dark:text-amber-300"
+              >
+                مطالعه مطلب
+                <ArrowLeftIcon className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function HomeView({ data, navigate, installEvt }: {
   data: AppData;
   navigate: (r: Route) => void;
@@ -96,15 +151,6 @@ export function HomeView({ data, navigate, installEvt }: {
     { label: "مطلب آموزشی", value: data.tests.length, href: () => navigate({ v: "cats" }) },
     { label: "کارت مرور", value: data.cards.length, href: () => navigate({ v: "leitner" }) },
     { label: "سوال آزمون", value: data.questions.length, href: () => navigate({ v: "quiz" }) },
-  ];
-
-  const mainGroups = [
-    "بیوشیمی خون",
-    "هورمون‌ها",
-    "ادرار و مایعات بدن",
-    "هماتولوژی",
-    "سرولوژی و میکروب‌شناسی",
-    "انگل‌شناسی",
   ];
 
   return (
@@ -138,7 +184,7 @@ export function HomeView({ data, navigate, installEvt }: {
           </div>
           <div className="mt-4 flex items-center gap-2 rounded-2xl bg-white/10 p-2.5 text-[11px] leading-5 text-teal-50/95">
             <GraduationCap className="h-4 w-4 shrink-0" />
-            طراحی و ساخت: سید مجتبی کاظمی — عضو هیأت علمی گروه پرستاری، دانشکده علوم پزشکی بهبهان
+            مرجع کامل تفاسیر آزمایش‌های تشخیصی برای کادر درمان و دانشجویان
           </div>
         </div>
       </section>
@@ -215,36 +261,8 @@ export function HomeView({ data, navigate, installEvt }: {
         </section>
       )}
 
-      {/* Groups */}
-      <section>
-        <h2 className="mb-2.5 flex items-center justify-between text-[15px] font-bold">
-          <span>دسته‌بندی موضوعی</span>
-          <button onClick={() => navigate({ v: "cats" })} className="text-xs font-semibold text-primary">
-            مشاهده همه
-          </button>
-        </h2>
-        <div className="grid grid-cols-2 gap-3">
-          {mainGroups.map((g) => {
-            const Icon = GROUP_ICONS[g] ?? FlaskConical;
-            const count = data.categories.filter((c) => c.group === g).reduce((a, c) => a + c.count, 0);
-            return (
-              <button
-                key={g}
-                onClick={() => navigate({ v: "cats" })}
-                className="flex items-center gap-3 rounded-2xl border bg-card p-3.5 text-right shadow-sm transition-transform active:scale-[0.98]"
-              >
-                <span className={cn("grid h-10 w-10 shrink-0 place-items-center rounded-2xl text-white", GROUP_COLORS[g])}>
-                  <Icon className="h-5 w-5" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-bold">{g}</span>
-                  <span className="block text-[11px] text-muted-foreground">{faNum(count)} مطلب</span>
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </section>
+      {/* Random clinical pearl */}
+      <ClinicalPearl data={data} navigate={navigate} />
     </div>
   );
 }

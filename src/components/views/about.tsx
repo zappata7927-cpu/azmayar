@@ -9,6 +9,8 @@ import {
   Database,
   Info,
   WifiOff,
+  Users,
+  UserRound,
 } from "lucide-react";
 import type { AppData } from "@/lib/types";
 import { faNum, cn } from "@/lib/utils";
@@ -18,6 +20,19 @@ const AUTHOR = {
   role: "عضو هیأت علمی گروه پرستاری",
   org: "دانشکده علوم پزشکی بهبهان",
 };
+
+const COLLABORATORS = [
+  {
+    name: "دکتر هادی حسین‌پور",
+    role: "استادیار باکتری‌شناسی",
+    org: "دانشکده علوم پزشکی بهبهان",
+  },
+  {
+    name: "فاطمه‌السادات معاشی",
+    role: "دانشجوی پرستاری",
+    org: "دانشکده علوم پزشکی بهبهان",
+  },
+];
 
 export function AboutView({ data, installEvt }: { data: AppData; installEvt: { prompt: () => void } | null }) {
   const steps = [
@@ -65,6 +80,28 @@ export function AboutView({ data, installEvt }: { data: AppData; installEvt: { p
           <div className="flex items-center gap-2 rounded-xl bg-muted/60 p-2.5">
             <WifiOff className="h-4 w-4 text-primary" /> بدون اینترنت هم کار می‌کند
           </div>
+        </div>
+      </section>
+
+      {/* scientific collaborators */}
+      <section className="rounded-2xl border bg-card p-4 shadow-sm">
+        <h2 className="mb-3 flex items-center gap-2 text-[15px] font-bold">
+          <Users className="h-4.5 w-4.5 text-primary" /> همکاران علمی
+        </h2>
+        <div className="space-y-2.5">
+          {COLLABORATORS.map((c) => (
+            <div key={c.name} className="flex items-center gap-3 rounded-2xl bg-muted/50 p-3.5">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary">
+                <UserRound className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-bold">{c.name}</p>
+                <p className="truncate text-xs leading-6 text-muted-foreground">
+                  {c.role} — {c.org}
+                </p>
+              </div>
+            </div>
+          ))}
         </div>
       </section>
 
@@ -125,7 +162,7 @@ export function AboutView({ data, installEvt }: { data: AppData; installEvt: { p
       {/* credit footer */}
       <div className="pb-2 text-center text-[11px] leading-6 text-muted-foreground">
         <p className="mt-1">
-          آزمـیار نسخه ۱.۰ — طراحی و ساخت: {AUTHOR.name}
+          آزمـیار نسخه ۱٫۱ — طراحی و ساخت: {AUTHOR.name}
         </p>
       </div>
     </div>

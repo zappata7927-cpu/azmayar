@@ -4,4 +4,5 @@
     <string name="title_activity_main">آزمـیار</string>
     <string name="package_name">ir.azmayar.app</string>
     <string name="custom_url_scheme">ir.azmayar.app</string>
+    <string name="widget_description">مرور کارت‌های جعبه لایتنر بدون ورود به اپلیکیشن</string>
 </resources>

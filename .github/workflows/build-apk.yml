@@ -75,6 +75,7 @@ jobs:
           cp android/app/build/outputs/apk/release/app-release.apk "apk-out/Azmayar-v${VERSION}.apk"
           ls -la apk-out
           echo "APK_NAME=Azmayar-v${VERSION}.apk" >> "$GITHUB_ENV"
+          echo "APK_VERSION=${VERSION}" >> "$GITHUB_ENV"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -87,15 +88,22 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           APK_FILE: apk-out/${{ env.APK_NAME }}
+          VERSION_NUM: ${{ env.APK_VERSION }}
         run: |
           gh release create latest-apk "$APK_FILE" \
             --title "آزمـیار — فایل نصبی اندروید (آخرین نسخه)" \
-            --notes "فایل نصبی اندروید اپلیکیشن آموزشی آزمـیار (نسخه ۱.۰.۰)
+            --notes "فایل نصبی اندروید اپلیکیشن آموزشی آزمـیار (نسخه ${VERSION_NUM})
 
           ### روش نصب
           ۱. فایل APK را دانلود کنید
           ۲. روی گوشی اجرا کنید و اجازه نصب از منابع ناشناس را بدهید
           ۳. برنامه آزمـیار را باز کنید — اینترنت لازم نیست، همه داده‌ها آفلاین است
+
+          ### نسخه ۱.۱ — تازه‌ها
+          - بانک سوال مفهومی جدید (۳۴۲ سوال) + توضیح آموزشی هر سوال و لینک مطالعه مطلب
+          - قابلیت جدید «تفسیر بالینی» برای تفسیر نتایج آزمایش
+          - کارت «نکته بالینی» در صفحه خانه
+          - ویجت جعبه لایتنر روی صفحه اصلی گوشی
 
           کافیست همیشه آخرین نسخه را نصب کنید؛ هر بار که ریپو به‌روز شود، این ریلیز جایگزین می‌شود." \
             --prerelease || \

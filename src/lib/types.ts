@@ -64,7 +64,7 @@ export interface FlashCard {
 
 export interface Question {
   id: string;
-  type: "abbr" | "full" | "normal" | "critical" | "increase" | "decrease";
+  type: string;
   tid: string;
   cat: string;
   q: string;
@@ -73,12 +73,21 @@ export interface Question {
   explanation: string;
 }
 
+export interface Pearl {
+  id: string;
+  tid: string;
+  cat: string;
+  test: string;
+  text: string;
+}
+
 export interface AppData {
   tests: TestRecord[];
   categories: Category[];
   cards: FlashCard[];
   questions: Question[];
   sources: string[];
+  pearls: Pearl[];
 }
 
 // ---------- base path (set at build time for GitHub Pages) ----------
@@ -92,14 +101,17 @@ let cache: AppData | null = null;
 
 export async function loadAppData(): Promise<AppData> {
   if (cache) return cache;
-  const [tests, categories, cards, questions, sources] = await Promise.all([
+  const [tests, categories, cards, questions, sources, pearls] = await Promise.all([
     fetch(assetUrl("/data/tests.json")).then((r) => r.json()),
     fetch(assetUrl("/data/categories.json")).then((r) => r.json()),
     fetch(assetUrl("/data/cards.json")).then((r) => r.json()),
     fetch(assetUrl("/data/questions.json")).then((r) => r.json()),
     fetch(assetUrl("/data/sources.json")).then((r) => r.json()),
+    fetch(assetUrl("/data/pearls.json"))
+      .then((r) => r.json())
+      .catch(() => [] as Pearl[]),
   ]);
-  cache = { tests, categories, cards, questions, sources };
+  cache = { tests, categories, cards, questions, sources, pearls: Array.isArray(pearls) ? pearls : [] };
   return cache;
 }
 

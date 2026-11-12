@@ -9,6 +9,7 @@ export type Route =
   | { v: "test"; id: string }
   | { v: "leitner" }
   | { v: "quiz" }
+  | { v: "interpret" }
   | { v: "about" };
 
 export function parseHash(hash: string): Route {
@@ -26,6 +27,8 @@ export function parseHash(hash: string): Route {
       return { v: "leitner" };
     case "quiz":
       return { v: "quiz" };
+    case "interpret":
+      return { v: "interpret" };
     case "about":
       return { v: "about" };
     default:
@@ -47,6 +50,8 @@ export function routeToHash(r: Route): string {
       return "#/leitner";
     case "quiz":
       return "#/quiz";
+    case "interpret":
+      return "#/interpret";
     case "about":
       return "#/about";
   }

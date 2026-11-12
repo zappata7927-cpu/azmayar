@@ -31,7 +31,11 @@ export function QuizView({ data, navigate }: { data: AppData; navigate: (r: Rout
     for (const q of data.questions) g.set(q.cat, (g.get(q.cat) ?? 0) + 1);
     return [...g.entries()].sort((a, b) => b[1] - a[1]);
   }, [data.questions]);
-  const mistakesCount = Object.keys(mistakes ?? {}).length;
+  // count only mistakes that still exist in the (possibly updated) question bank
+  const mistakesCount = useMemo(() => {
+    const ids = new Set(data.questions.map((q) => q.id));
+    return Object.keys(mistakes ?? {}).filter((id) => ids.has(id)).length;
+  }, [mistakes, data.questions]);
 
   const startQuiz = (mode: QuizMode) => {
     let s: QuizSession;
@@ -166,6 +170,15 @@ export function QuizView({ data, navigate }: { data: AppData; navigate: (r: Rout
               {correct ? "درست بود!" : "پاسخ صحیح مشخص شد"}
             </p>
             <p className="text-sm leading-7 text-foreground/85">{q.explanation}</p>
+            {q.tid && data.tests.some((t) => t.id === q.tid) && (
+              <button
+                onClick={() => navigate({ v: "test", id: q.tid })}
+                className="mt-2.5 flex items-center gap-1.5 rounded-xl bg-primary/10 px-3.5 py-2 text-xs font-bold text-primary transition-transform active:scale-95"
+              >
+                <BookOpenCheck className="h-3.5 w-3.5" />
+                مطالعه مطلب «{data.tests.find((t) => t.id === q.tid)?.name}»
+              </button>
+            )}
             <button
               onClick={next}
               className="mt-3 flex min-h-[46px] w-full items-center justify-center gap-2 rounded-2xl bg-primary font-bold text-white transition-transform active:scale-[0.98]"

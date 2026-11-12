@@ -8,6 +8,8 @@ export interface LeitnerState {
   due: number; // epoch ms
   seen: number;
   ok: number;
+  /** last modification time (epoch ms) — used to merge app↔widget edits */
+  updatedAt?: number;
 }
 
 export interface QuizRun {
@@ -41,6 +43,8 @@ interface AppState {
   setSettings: (s: Partial<Settings>) => void;
   resetLeitner: () => void;
   resetAll: () => void;
+  /** merge leitner progress synced from the Android home-screen widget (per-card last-write-wins) */
+  mergeLeitnerFromWidget: (native: Record<string, Partial<LeitnerState>>) => void;
 }
 
 const DEFAULT_SETTINGS: Settings = { fontSize: "md", dailyCards: 10, theme: "system" };
@@ -61,6 +65,7 @@ function sanitize(st: Partial<AppState> | undefined): Partial<AppState> {
           due: (v as LeitnerState).due,
           seen: Number((v as LeitnerState).seen) || 0,
           ok: Number((v as LeitnerState).ok) || 0,
+          updatedAt: typeof (v as LeitnerState).updatedAt === "number" ? (v as LeitnerState).updatedAt : undefined,
         };
       }
     }
@@ -117,6 +122,7 @@ export const useAppStore = create<AppState>()(
                 due: cardDue(nextBox, good),
                 seen: cur.seen + 1,
                 ok: cur.ok + (good ? 1 : 0),
+                updatedAt: Date.now(),
               },
             },
           };
@@ -129,6 +135,29 @@ export const useAppStore = create<AppState>()(
       resetLeitner: () => set({ leitner: {} }),
       resetAll: () =>
         set({ favorites: [], read: [], lastTest: null, leitner: {}, quizHistory: [], mistakes: {} }),
+      mergeLeitnerFromWidget: (native) =>
+        set((st) => {
+          if (!native || typeof native !== "object") return st;
+          const merged = { ...st.leitner };
+          let changed = false;
+          for (const [id, nv] of Object.entries(native)) {
+            if (!nv || typeof nv !== "object" || typeof nv.due !== "number" || typeof nv.box !== "number") continue;
+            const cur = merged[id];
+            const nUpd = typeof nv.updatedAt === "number" ? nv.updatedAt : 0;
+            const cUpd = cur?.updatedAt ?? 0;
+            if (!cur || nUpd > cUpd) {
+              merged[id] = {
+                box: nv.box,
+                due: nv.due,
+                seen: cur?.seen ?? 0,
+                ok: cur?.ok ?? 0,
+                updatedAt: nUpd || Date.now(),
+              };
+              changed = true;
+            }
+          }
+          return changed ? { leitner: merged } : st;
+        }),
     }),
     {
       name: "azmayar-store-v1",

@@ -33,6 +33,21 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
+
+        <receiver
+            android:name=".LeitnerWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="ir.azmayar.app.WIDGET_FLIP" />
+                <action android:name="ir.azmayar.app.WIDGET_GOOD" />
+                <action android:name="ir.azmayar.app.WIDGET_BAD" />
+                <action android:name="ir.azmayar.app.WIDGET_REFRESH" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/leitner_widget_info" />
+        </receiver>
     </application>
 
     <!-- Permissions -->

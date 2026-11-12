@@ -16,6 +16,7 @@ import {
   RotateCcw,
   X,
   FlaskConical,
+  Stethoscope,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -42,7 +43,9 @@ import { TestView } from "@/components/views/test";
 import { LeitnerView } from "@/components/views/leitner";
 import { QuizView } from "@/components/views/quiz";
 import { AboutView } from "@/components/views/about";
+import { InterpretView } from "@/components/views/interpret";
 import { ViewErrorBoundary } from "@/components/error-boundary";
+import { initWidgetSync } from "@/lib/widget-bridge";
 import { cn, faNum } from "@/lib/utils";
 
 // ---------------- Splash ----------------
@@ -68,8 +71,9 @@ function Splash() {
 const TABS: { key: string; title: string; icon: LucideIcon; route: Route }[] = [
   { key: "home", title: "خانه", icon: Home, route: { v: "home" } },
   { key: "cats", title: "دسته‌بندی", icon: LayoutGrid, route: { v: "cats" } },
-  { key: "leitner", title: "مرور لایتنر", icon: Layers, route: { v: "leitner" } },
+  { key: "leitner", title: "لایتنر", icon: Layers, route: { v: "leitner" } },
   { key: "quiz", title: "آزمون", icon: ClipboardCheck, route: { v: "quiz" } },
+  { key: "interpret", title: "تفسیر", icon: Stethoscope, route: { v: "interpret" } },
   { key: "about", title: "درباره", icon: Info, route: { v: "about" } },
 ];
 
@@ -305,7 +309,12 @@ export function AppShell() {
     if ("serviceWorker" in navigator && !location.hostname.startsWith("localhost") && !location.hostname.startsWith("127.")) {
       navigator.serviceWorker.register(assetUrl("/sw.js")).catch(() => {});
     }
-    return () => window.removeEventListener("beforeinstallprompt", onInstall);
+    // Android home-screen widget sync (no-op on web)
+    const stopWidgetSync = initWidgetSync();
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onInstall);
+      stopWidgetSync();
+    };
   }, [onInstall]);
 
   const dueBadge = useMemo(() => {
@@ -367,6 +376,7 @@ export function AppShell() {
           {route.v === "test" && <TestView data={data} id={route.id} navigate={navigate} />}
           {route.v === "leitner" && <LeitnerView data={data} navigate={navigate} />}
           {route.v === "quiz" && <QuizView data={data} navigate={navigate} />}
+          {route.v === "interpret" && <InterpretView data={data} />}
           {route.v === "about" && <AboutView data={data} installEvt={installEvt} />}
         </ViewErrorBoundary>
       </main>
