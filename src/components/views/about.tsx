@@ -125,7 +125,7 @@ export function AboutView({ data }: { data: AppData }) {
       {/* credit footer */}
       <div className="pb-2 text-center text-[11px] leading-6 text-muted-foreground">
         <p className="mt-1">
-          آزمـیار نسخه ۱٫۲٫۱ — طراحی و ساخت: {AUTHOR.name}
+          آزمـیار نسخه ۱٫۲٫۲ — طراحی و ساخت: {AUTHOR.name}
         </p>
       </div>
     </div>

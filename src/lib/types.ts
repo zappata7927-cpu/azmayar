@@ -1,5 +1,5 @@
 // ---------- Data types parsed from the lab database ----------
-export type ItemKind = "bullet" | "num" | "sub" | "image";
+export type ItemKind = "bullet" | "num" | "sub" | "image" | "para";
 
 export interface SectionItem {
   kind: ItemKind;

@@ -67,6 +67,32 @@ function BulletList({ items, ordered }: { items: SectionItem[]; ordered?: boolea
   );
 }
 
+/** renders prose paragraphs and bullet items interleaved in the exact source order */
+function Flow({ items }: { items: SectionItem[] }) {
+  const groups: { kind: "list" | "para"; items: SectionItem[] }[] = [];
+  for (const it of items) {
+    const last = groups[groups.length - 1];
+    if (it.kind === "para") {
+      groups.push({ kind: "para", items: [it] });
+    } else if (last && last.kind === "list") {
+      last.items.push(it);
+    } else {
+      groups.push({ kind: "list", items: [it] });
+    }
+  }
+  return (
+    <div className="space-y-3">
+      {groups.map((g, i) =>
+        g.kind === "para" ? (
+          <p key={i} className="reading-body text-[0.95em] leading-7 text-foreground/90">{g.items[0].text}</p>
+        ) : (
+          <BulletList key={i} items={g.items} ordered={g.items.every((x) => x.kind === "num")} />
+        )
+      )}
+    </div>
+  );
+}
+
 function Chips({ items }: { items: string[] }) {
   return (
     <div className="flex flex-wrap gap-2">
@@ -264,12 +290,13 @@ export const SectionRenderer = memo(function SectionRenderer({ section }: { sect
     case "other":
     default: {
       const hasList = (s.items?.length ?? 0) > 0;
+      const mixed = s.items?.some((i) => i.kind === "para");
       return (
         <SectionShell icon={FileText} title={s.title || "توضیحات"} tone="teal">
           {s.paras?.length ? <Prose paras={s.paras} /> : null}
           {hasList ? (
             <div className={s.paras?.length ? "mt-3" : ""}>
-              <BulletList items={s.items ?? []} ordered={s.items?.every((i) => i.kind === "num")} />
+              {mixed ? <Flow items={s.items ?? []} /> : <BulletList items={s.items ?? []} ordered={s.items?.every((i) => i.kind === "num")} />}
             </div>
           ) : null}
         </SectionShell>
