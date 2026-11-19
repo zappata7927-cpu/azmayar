@@ -50,6 +50,21 @@ export function buildSession(data: AppData, state: Record<string, LeitnerState>,
   return due.slice(0, limit);
 }
 
+/** all cards of one box (box 0 = new cards), overdue first — for manual box review */
+export function boxCards(data: AppData, state: Record<string, LeitnerState>, box: number): SessionCard[] {
+  const out: SessionCard[] = [];
+  for (const card of data.cards) {
+    const st = state[card.id];
+    if (box === 0) {
+      if (!st) out.push({ card, isNew: true, box: 0 });
+    } else if (st && st.box === box) {
+      out.push({ card, isNew: false, box });
+    }
+  }
+  out.sort((a, b) => (state[a.card.id]?.due ?? 0) - (state[b.card.id]?.due ?? 0));
+  return out;
+}
+
 export function categoryOfCard(data: AppData, card: FlashCard): string {
   return card.cat;
 }

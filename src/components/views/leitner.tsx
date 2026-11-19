@@ -4,44 +4,66 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Layers,
   Play,
-  RotateCcw,
   Check,
   X,
   BrainCircuit,
-  Inbox,
   PartyPopper,
-  ChevronLeft,
   BookOpen,
-  Archive,
   ArchiveRestore,
+  ChevronLeft,
+  MousePointerClick,
+  Clock3,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { AppData } from "@/lib/types";
 import type { Route } from "@/lib/nav";
 import { useAppStore, BOX_INTERVALS } from "@/lib/store";
-import { leitnerInfo, buildSession, type SessionCard } from "@/lib/leitner";
+import { leitnerInfo, buildSession, boxCards, type SessionCard } from "@/lib/leitner";
 import { faNum } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { tapHaptic } from "@/lib/haptics";
 import { pullWidgetState } from "@/lib/widget-bridge";
 
 const BOX_LABELS = ["جدید", "جعبه ۱", "جعبه ۲", "جعبه ۳", "جعبه ۴", "جعبه ۵"];
+const BOX_COLORS = ["bg-slate-400", "bg-rose-400", "bg-amber-400", "bg-teal-400", "bg-emerald-500", "bg-emerald-600"];
+const BOX_INTERVAL_TEXT = [
+  "کارت‌هایی که هنوز مرور نشده‌اند — با لمس این ردیف اولین کارت‌ها را یاد بگیر",
+  "کارت‌هایی که بلد نبودیدی؛ هر ۱ روز یک‌بار مرور می‌شوند",
+  "مرور هر ۳ روز — با لمس این ردیف می‌توانی زودتر از موعد هم مرور کنی",
+  "مرور هر ۷ روز — با لمس این ردیف می‌توانی زودتر از موعد هم مرور کنی",
+  "مرور هر ۱۴ روز — با لمس این ردیف می‌توانی زودتر از موعد هم مرور کنی",
+  "مرور هر ۳۰ روز — با لمس این ردیف می‌توانی زودتر از موعد هم مرور کنی",
+];
 
-function BoxBars({ counts, total }: { counts: number[]; total: number }) {
-  const colors = ["bg-slate-400", "bg-rose-400", "bg-amber-400", "bg-teal-400", "bg-emerald-500", "bg-emerald-600"];
+function BoxBars({ counts, onPick }: { counts: number[]; onPick: (box: number) => void }) {
   return (
     <div className="space-y-2">
       {counts.map((n, i) => (
-        <div key={i} className="flex items-center gap-2.5">
-          <span className="w-16 shrink-0 text-xs font-semibold text-muted-foreground">{BOX_LABELS[i]}</span>
-          <div className="h-3 flex-1 overflow-hidden rounded-full bg-muted">
-            <div
-              className={cn("h-full rounded-full transition-all duration-500", colors[i])}
-              style={{ width: `${total ? Math.max(n / total * 100, n > 0 ? 4 : 0) : 0}%` }}
+        <button
+          key={i}
+          onClick={() => onPick(i)}
+          disabled={n === 0}
+          aria-label={`مرور ${BOX_LABELS[i]} (${n} کارت)`}
+          className={cn(
+            "group flex w-full items-center gap-2.5 rounded-xl p-1.5 transition-colors",
+            n > 0 ? "hover:bg-muted active:scale-[0.99]" : "opacity-55"
+          )}
+        >
+          <span className="w-16 shrink-0 text-right text-xs font-bold">{BOX_LABELS[i]}</span>
+          <span className="h-3 flex-1 overflow-hidden rounded-full bg-muted">
+            <span
+              className={cn("block h-full rounded-full transition-all duration-500", BOX_COLORS[i])}
+              style={{ width: `${Math.max(n / Math.max(counts.reduce((a, b) => a + b, 0), 1) * 100, n > 0 ? 6 : 0)}%` }}
             />
-          </div>
-          <span className="w-10 shrink-0 text-left text-xs font-bold">{faNum(n)}</span>
-        </div>
+          </span>
+          <span className="w-9 shrink-0 text-left text-xs font-bold">{faNum(n)}</span>
+          <ChevronLeft
+            className={cn(
+              "h-4 w-4 shrink-0 transition-transform group-active:-translate-x-0.5",
+              n > 0 ? "text-muted-foreground group-hover:text-primary" : "invisible"
+            )}
+          />
+        </button>
       ))}
     </div>
   );
@@ -50,6 +72,7 @@ function BoxBars({ counts, total }: { counts: number[]; total: number }) {
 export function LeitnerView({ data, navigate }: { data: AppData; navigate: (r: Route) => void }) {
   const { leitner, answerCard, settings } = useAppStore();
   const [session, setSession] = useState<SessionCard[] | null>(null);
+  const [sessionLabel, setSessionLabel] = useState("مرور امروز");
   const [pos, setPos] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [results, setResults] = useState<{ good: number; bad: number }>({ good: 0, bad: 0 });
@@ -61,6 +84,15 @@ export function LeitnerView({ data, navigate }: { data: AppData; navigate: (r: R
     void pullWidgetState();
   }, []);
 
+  const beginSession = (cards: SessionCard[], label: string) => {
+    if (!cards.length) return;
+    setSession(cards);
+    setSessionLabel(label);
+    setPos(0);
+    setFlipped(false);
+    setResults({ good: 0, bad: 0 });
+  };
+
   const start = () => {
     void tapHaptic();
     const cards = buildSession(data, leitner, settings.dailyCards);
@@ -68,10 +100,17 @@ export function LeitnerView({ data, navigate }: { data: AppData; navigate: (r: R
       toast.info("در حال حاضر کارتی برای مرور ندارید");
       return;
     }
-    setSession(cards);
-    setPos(0);
-    setFlipped(false);
-    setResults({ good: 0, bad: 0 });
+    beginSession(cards, "مرور امروز");
+  };
+
+  const startBox = (box: number) => {
+    void tapHaptic();
+    const cards = boxCards(data, leitner, box).slice(0, settings.dailyCards);
+    if (!cards.length) return;
+    beginSession(
+      cards,
+      box === 0 ? "یادگیری کارت‌های جدید" : `مرور ${BOX_LABELS[box]}`
+    );
   };
 
   const answer = (good: boolean) => {
@@ -84,7 +123,7 @@ export function LeitnerView({ data, navigate }: { data: AppData; navigate: (r: R
       setSession(null);
       setPos(0);
       const pct = Math.round(((results.good + (good ? 1 : 0)) / session!.length) * 100);
-      toast.success(`جلسه مرور تمام شد — دقت ${faNum(pct)}٪`);
+      toast.success(`${sessionLabel} تمام شد — دقت ${faNum(pct)}٪`);
     } else {
       setPos(pos + 1);
       setFlipped(false);
@@ -99,12 +138,13 @@ export function LeitnerView({ data, navigate }: { data: AppData; navigate: (r: R
         {/* progress */}
         <div>
           <div className="mb-2 flex items-center justify-between text-xs font-semibold text-muted-foreground">
-            <span>
-              کارت {faNum(pos + 1)} از {faNum(session.length)}
-            </span>
+            <span className="rounded-lg bg-primary/10 px-2 py-1 text-primary">{sessionLabel}</span>
             <span className="flex items-center gap-2">
               <span className="text-emerald-600">✓ {faNum(results.good)}</span>
               <span className="text-rose-500">✗ {faNum(results.bad)}</span>
+              <span>
+                کارت {faNum(pos + 1)} از {faNum(session.length)}
+              </span>
             </span>
           </div>
           <div className="h-2 overflow-hidden rounded-full bg-muted">
@@ -186,19 +226,19 @@ export function LeitnerView({ data, navigate }: { data: AppData; navigate: (r: R
   // ---------- dashboard ----------
   return (
     <div className="space-y-5">
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-bl from-teal-700 via-teal-600 to-teal-500 p-5 text-white shadow-lg">
+      <div className="hero-aurora relative overflow-hidden rounded-3xl p-5 text-white shadow-lg">
         <div className="absolute -left-10 -top-10 h-36 w-36 rounded-full bg-white/10 blur-2xl" />
         <div className="relative">
-          <div className="flex items-center gap-2 text-xs font-semibold text-teal-100/90">
+          <div className="flex items-center gap-2 text-xs font-semibold text-white/85">
             <Layers className="h-4 w-4" />
             جعبه لایتنر — مرور فاصله‌دار
           </div>
           <div className="mt-3 flex items-end justify-between">
             <div>
               <div className="text-4xl font-black">{faNum(info.dueCount)}</div>
-              <div className="mt-1 text-sm text-teal-50/85">کارت آماده مرور امروز</div>
+              <div className="mt-1 text-sm text-white/85">کارت آماده مرور امروز</div>
             </div>
-            <div className="text-left text-xs text-teal-50/85">
+            <div className="text-left text-xs text-white/85">
               <p>مجموع کارت‌ها: <b>{faNum(info.total)}</b></p>
               <p className="mt-1">مسلط‌شده (جعبه ۴ و ۵): <b>{faNum(info.learned)}</b></p>
             </div>
@@ -216,11 +256,21 @@ export function LeitnerView({ data, navigate }: { data: AppData; navigate: (r: R
 
       {/* boxes */}
       <section className="rounded-2xl border bg-card p-4 shadow-sm">
-        <h2 className="mb-3.5 text-[15px] font-bold">وضعیت جعبه‌ها</h2>
-        <BoxBars counts={info.boxCounts} total={info.total} />
-        <p className="mt-3.5 rounded-xl bg-muted/60 p-3 text-[11px] leading-5 text-muted-foreground">
-          سیستم لایتنر: کارت‌های «بلد بودم» به جعبه بعدی می‌روند و با فاصله‌های
-          {" "}{BOX_INTERVALS.map((d) => faNum(d)).join("، ")} روز بازبینی می‌شوند؛ «بلد نبودم» به جعبه ۱ برمی‌گردد.
+        <h2 className="mb-1 flex items-center gap-2 text-[15px] font-bold">
+          <MousePointerClick className="h-4 w-4 text-primary" />
+          وضعیت جعبه‌ها
+        </h2>
+        <p className="mb-3.5 text-[11px] leading-5 text-muted-foreground">
+          روی هر ردیف بزن تا کارت‌های همان جعبه را مرور کنی — حتی اگر موعدشان نرسیده باشد.
+        </p>
+        <BoxBars counts={info.boxCounts} onPick={startBox} />
+        <p className="mt-3.5 flex items-start gap-1.5 rounded-xl bg-muted/60 p-3 text-[11px] leading-5 text-muted-foreground">
+          <Clock3 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>
+            سیستم لایتنر: «بلد بودم» کارت را یک جعبه جلو می‌برد و با فاصله‌های
+            {" "}{BOX_INTERVALS.map((d) => faNum(d)).join("، ")} روز دوباره پرسیده می‌شود؛ «بلد نبودم» به جعبه ۱ برمی‌گردد.
+            مرور زودتر از موعد هم کارت را جلو می‌برد.
+          </span>
         </p>
       </section>
 
@@ -228,7 +278,7 @@ export function LeitnerView({ data, navigate }: { data: AppData; navigate: (r: R
         <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/8 p-5 text-center">
           <PartyPopper className="mx-auto h-8 w-8 text-emerald-500" />
           <p className="mt-2 text-sm font-bold">همه کارت‌های امروز مرور شد!</p>
-          <p className="mt-1 text-xs text-muted-foreground">فردا دوباره سر بزنید یا جلسه جدیدی از کارت‌های جدید بسازید.</p>
+          <p className="mt-1 text-xs text-muted-foreground">فردا دوباره سر بزن، یا همین حالا از ردیف جعبه‌ها مرور دستی بزن.</p>
         </div>
       )}
 

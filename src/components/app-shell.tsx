@@ -55,6 +55,7 @@ import { AboutView } from "@/components/views/about";
 import { InterpretView } from "@/components/views/interpret";
 import { ViewErrorBoundary } from "@/components/error-boundary";
 import { initWidgetSync, pullWidgetState, isNativeApp } from "@/lib/widget-bridge";
+import { initReminder } from "@/lib/reminder";
 import { App } from "@capacitor/app";
 import { cn, faNum } from "@/lib/utils";
 
@@ -320,8 +321,11 @@ export function AppShell() {
     }
     // Android home-screen widget sync (no-op on web)
     const stopWidgetSync = initWidgetSync();
+    // smart daily reminder (no-op on web; also re-runs on every resume below)
+    void initReminder();
     // Android hardware back button: history back, or exit confirmation at the root
     let backSub: { remove: () => void } | null = null;
+    let resumeSub: { remove: () => void } | null = null;
     if (isNativeApp()) {
       void App.addListener("backButton", ({ canGoBack }) => {
         if (exitOpenRef.current) {
@@ -333,10 +337,20 @@ export function AppShell() {
       }).then((s) => {
         backSub = s;
       });
+      // every time the app comes to the foreground: resync the widget and
+      // reschedule the reminder (so it only fires on days without a visit)
+      void App.addListener("appStateChange", (s) => {
+        if (s.isActive) {
+          void initReminder();
+        }
+      }).then((s) => {
+        resumeSub = s;
+      });
     }
     return () => {
       stopWidgetSync();
       backSub?.remove();
+      resumeSub?.remove();
     };
   }, []);
 

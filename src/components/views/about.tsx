@@ -26,6 +26,16 @@ const COLLABORATORS = [
     org: "دانشکده علوم پزشکی بهبهان",
   },
   {
+    name: "دکتر رحمت اله سلطانی",
+    role: "استادیار آموزش پزشکی",
+    org: "دانشکده علوم پزشکی بهبهان",
+  },
+  {
+    name: "یاسمن برفی",
+    role: "دانشجوی پرستاری",
+    org: "دانشکده علوم پزشکی بهبهان",
+  },
+  {
     name: "فاطمه‌السادات معاشی",
     role: "دانشجوی پرستاری",
     org: "دانشکده علوم پزشکی بهبهان",
@@ -36,16 +46,16 @@ export function AboutView({ data }: { data: AppData }) {
   return (
     <div className="space-y-5">
       {/* author card */}
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-bl from-teal-700 via-teal-600 to-teal-500 p-6 text-center text-white shadow-lg">
+      <section className="hero-aurora relative overflow-hidden rounded-3xl p-6 text-center text-white shadow-lg">
         <div className="absolute -left-10 -top-10 h-36 w-36 rounded-full bg-white/10 blur-2xl" />
         <div className="absolute -bottom-12 -right-8 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
         <div className="relative">
           <span className="mx-auto grid h-20 w-20 place-items-center rounded-3xl bg-white/15 backdrop-blur-sm">
             <GraduationCap className="h-10 w-10" />
           </span>
-          <p className="mt-2 text-[11px] font-bold uppercase tracking-widest text-teal-100/85">طراح و سازنده</p>
+          <p className="mt-2 text-[11px] font-bold uppercase tracking-widest text-white/85">طراح و سازنده</p>
           <h1 className="mt-1 text-[1.5rem] font-black">{AUTHOR.name}</h1>
-          <p className="mt-2 text-sm leading-7 text-teal-50/95">
+          <p className="mt-2 text-sm leading-7 text-white/90">
             {AUTHOR.role}
             <br />
             {AUTHOR.org}
@@ -125,7 +135,7 @@ export function AboutView({ data }: { data: AppData }) {
       {/* credit footer */}
       <div className="pb-2 text-center text-[11px] leading-6 text-muted-foreground">
         <p className="mt-1">
-          آزمـیار نسخه ۱٫۲٫۲ — طراحی و ساخت: {AUTHOR.name}
+          آزمـیار نسخه ۱٫۲٫۳ — طراحی و ساخت: {AUTHOR.name}
         </p>
       </div>
     </div>

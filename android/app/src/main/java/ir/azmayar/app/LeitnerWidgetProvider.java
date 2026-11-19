@@ -35,6 +35,7 @@ public class LeitnerWidgetProvider extends AppWidgetProvider {
     public static final String KEY_STATE = "leitner_state";
     public static final String KEY_CURRENT = "current_id";
     public static final String KEY_FLIPPED = "flipped";
+    public static final String KEY_REV = "leitner_rev";
 
     public static final String ACTION_FLIP = "mojtaba.app.lab.WIDGET_FLIP";
     public static final String ACTION_GOOD = "mojtaba.app.lab.WIDGET_GOOD";
@@ -193,7 +194,9 @@ public class LeitnerWidgetProvider extends AppWidgetProvider {
             st.put("due", due);
             st.put("updatedAt", now);
             state.put(curId, st);
-            sp.edit().putString(KEY_STATE, state.toString()).apply();
+            sp.edit().putString(KEY_STATE, state.toString())
+                .putInt(KEY_REV, sp.getInt(KEY_REV, 0) + 1)
+                .apply();
         } catch (Exception ignored) {
         }
     }

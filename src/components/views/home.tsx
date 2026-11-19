@@ -135,18 +135,18 @@ export function HomeView({ data, navigate }: {
   return (
     <div className="space-y-5">
       {/* Hero */}
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-bl from-teal-700 via-teal-600 to-teal-500 p-5 text-white shadow-lg">
+      <section className="hero-aurora relative overflow-hidden rounded-3xl p-5 text-white shadow-lg">
         <div className="absolute -left-10 -top-10 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
         <div className="absolute -bottom-14 -right-6 h-44 w-44 rounded-full bg-white/10 blur-2xl" />
         <div className="relative">
-          <div className="flex items-center gap-2 text-xs font-semibold text-teal-100/90">
+          <div className="flex items-center gap-2 text-xs font-semibold text-white/85">
             <Sparkles className="h-3.5 w-3.5" />
             اپلیکیشن آموزشی کادر درمان و دانشجویان علوم پزشکی
           </div>
           <h1 className="mt-1.5 text-[1.65rem] font-black leading-snug">
             آزمایش‌های آزمایشگاهی را اصولی بیاموزید
           </h1>
-          <p className="mt-2 text-sm leading-6 text-teal-50/90">
+          <p className="mt-2 text-sm leading-6 text-white/85">
             مرجع کامل تفسیر آزمایش‌ها با دسته‌بندی موضوعی، جعبه لایتنر برای مرور هوشمند و آزمون از مباحث خوانده‌شده
           </p>
           <div className="mt-4 grid grid-cols-3 gap-2">
@@ -157,11 +157,11 @@ export function HomeView({ data, navigate }: {
                 className="rounded-2xl bg-white/12 p-3 text-center backdrop-blur-sm transition-colors hover:bg-white/20"
               >
                 <div className="text-lg font-black">{faNum(s.value)}</div>
-                <div className="mt-0.5 text-[11px] font-semibold text-teal-50/85">{s.label}</div>
+                <div className="mt-0.5 text-[11px] font-semibold text-white/85">{s.label}</div>
               </button>
             ))}
           </div>
-          <div className="mt-4 flex items-center gap-2 rounded-2xl bg-white/10 p-2.5 text-[11px] leading-5 text-teal-50/95">
+          <div className="mt-4 flex items-center gap-2 rounded-2xl bg-white/10 p-2.5 text-[11px] leading-5 text-white/90">
             <GraduationCap className="h-4 w-4 shrink-0" />
             مرجع کامل تفاسیر آزمایش‌های تشخیصی برای کادر درمان و دانشجویان
           </div>

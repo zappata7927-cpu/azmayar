@@ -111,6 +111,13 @@ function Chips({ items }: { items: string[] }) {
 
 // ---------------- section shell ----------------
 
+/** some source-document image placeholders («xxx.png», [xxx.png]) leaked into
+ *  titles; no image assets exist yet, so they are stripped at render time too */
+const IMG_MARK = /«[^»"\\]{0,80}?\.(?:png|jpe?g|gif|svg|webp)»|\[[^\]"\]\\]{0,80}?\.(?:png|jpe?g|gif|svg|webp)\]/g;
+function cleanTitle(t: string): string {
+  return t.replace(IMG_MARK, "").replace(/\s+/g, " ").trim();
+}
+
 interface ShellProps {
   icon: LucideIcon;
   title: string;
@@ -139,7 +146,7 @@ function SectionShell({ icon: Icon, title, tone, unit, children, className }: Sh
         <span className={cn("flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-sm", t.icon)}>
           <Icon className="h-[18px] w-[18px]" />
         </span>
-        <h3 className="text-[1.02rem] font-bold">{title}</h3>
+        <h3 className="text-[1.02rem] font-bold">{cleanTitle(title)}</h3>
         {unit && (
           <span className="mr-auto rounded-lg bg-muted px-2 py-1 text-[11px] font-semibold text-muted-foreground" dir="ltr">
             {unit}

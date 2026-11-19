@@ -40,7 +40,7 @@ export function TestView({ data, id, navigate }: { data: AppData; id: string; na
   return (
     <div className="space-y-4">
       {/* header card */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-bl from-teal-700 via-teal-600 to-teal-500 p-5 text-white shadow-lg">
+      <div className="hero-aurora relative overflow-hidden rounded-3xl p-5 text-white shadow-lg">
         <div className="absolute -left-8 -top-8 h-32 w-32 rounded-full bg-white/10 blur-xl" />
         <div className="relative">
           <div className="flex items-start justify-between gap-3">
@@ -61,7 +61,7 @@ export function TestView({ data, id, navigate }: { data: AppData; id: string; na
               <Star className={cn("h-5 w-5", fav ? "fill-amber-300 text-amber-300" : "text-white")} />
             </button>
           </div>
-          <div className="mt-3 flex items-center justify-between text-[11px] text-teal-50/80">
+          <div className="mt-3 flex items-center justify-between text-[11px] text-white/80">
             <span>
               مطلب {faNum(index + 1)} از {faNum(siblings.length)} در این دسته
             </span>
