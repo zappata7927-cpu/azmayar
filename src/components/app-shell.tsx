@@ -376,7 +376,7 @@ export function AppShell() {
   return (
     <div className="mx-auto flex min-h-screen max-w-2xl flex-col border-x border-border/40 bg-background">
       {/* Top bar */}
-      <header className="sticky top-0 z-30 border-b bg-card/85 backdrop-blur-lg">
+      <header className="pt-safe-min sticky top-0 z-30 border-b bg-card/85 backdrop-blur-lg">
         <div className="flex items-center gap-1.5 px-3 py-2">
           {route.v === "test" || route.v === "cat" ? (
             <Button variant="ghost" size="icon" onClick={() => navigate(route.v === "test" ? { v: "cat", cat: (data.tests.find((t) => t.id === route.id)?.cat) ?? "" } : { v: "cats" })} aria-label="بازگشت" className="rounded-xl">
@@ -438,7 +438,7 @@ export function AppShell() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      <Toaster position="top-center" richColors />
+      <Toaster position="top-center" richColors offset={40} />
     </div>
   );
 }

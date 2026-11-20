@@ -190,6 +190,13 @@
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
+/* keep the top bar actions (search / settings) below the Android status bar and notch;
+   the static 28px floor covers devices where the WebView is edge-to-edge but reports
+   no cutout inset, so the buttons are never hidden behind the system bar */
+.pt-safe-min {
+  padding-top: max(env(safe-area-inset-top, 0px), 28px);
+}
+
 /* creative aurora hero — teal sea blending into indigo night, used by the main hero cards */
 .hero-aurora {
   background:

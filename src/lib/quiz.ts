@@ -44,8 +44,7 @@ export function buildQuiz(
   // Keep only well-formed questions so a malformed record can never break a quiz session.
   const valid = (data.questions ?? []).filter(
     (q) => q && typeof q.q === "string" && q.q.trim() && Array.isArray(q.options) && q.options.length >= 2
-  );
-  let pool: Question[] = [];
+  );  let pool: Question[] = [];
   let label = "";
   if (mode.kind === "cat") {
     pool = valid.filter((q) => q.cat === mode.cat);
@@ -71,7 +70,28 @@ export function buildQuiz(
   }
   const seed = Date.now() % 100000000;
   const shuffled = shuffle(pool, seed);
-  return { questions: shuffled.slice(0, Math.max(1, count)), label };
+  // Randomly permute the options of every picked question so the correct answer is not
+  // always in the same letter (the bank had ~73% of correct answers in option «الف»).
+  const rng = mulberry(seed ^ 0x9e3779b9);
+  const questions = shuffled.slice(0, Math.max(1, count)).map((q) => shuffleQuestionOptions(q, rng));
+  return { questions, label };
+}
+
+// Options that cross-reference other options by letter («گزینه الف و ب …») must keep
+// their original order, otherwise the reference would point at a different option.
+const OPTION_REF_RE = /گزینه\s*(?:های)?\s*[الف-وى]|(?:^|\s)[الف-وى]\s*(?:و|،|\/)\s*[الف-وى]\s*(?:صحیح|درست)/;
+
+function shuffleQuestionOptions(q: Question, rng: () => number): Question {
+  const opts = q.options;
+  if (!Array.isArray(opts) || opts.length < 2) return q;
+  const answer = Number.isInteger(q.answer) && q.answer >= 0 && q.answer < opts.length ? q.answer : 0;
+  if (opts.some((o) => OPTION_REF_RE.test(String(o ?? "")))) return q;
+  const order = opts.map((_, i) => i);
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  return { ...q, options: order.map((i) => opts[i]), answer: order.indexOf(answer) };
 }
 
 export function quizCountsFor(data: AppData): Record<string, number> {

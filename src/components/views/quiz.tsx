@@ -1,11 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ClipboardCheck, Play, Check, X, ChevronLeft, Trophy, BookOpenCheck, RotateCcw, History, BadgeCheck, Flame, GraduationCap } from "lucide-react";
+import { ClipboardCheck, Play, Check, X, ChevronLeft, Trophy, BookOpenCheck, RotateCcw, History, BadgeCheck, Flame, GraduationCap, TrendingUp, Award, ChevronDown, ChevronUp } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import type { AppData, Question } from "@/lib/types";
 import type { Route } from "@/lib/nav";
-import { useAppStore } from "@/lib/store";
+import { useAppStore, type QuizRun } from "@/lib/store";
 import { buildQuiz, quizCountsFor, type QuizMode, type QuizSession } from "@/lib/quiz";
 import { faNum, cn } from "@/lib/utils";
 import { tapHaptic } from "@/lib/haptics";
@@ -14,6 +14,137 @@ import { toast } from "sonner";
 const OPTION_LETTERS = ["الف", "ب", "ج", "د", "ه", "و"];
 
 type Phase = "setup" | "run" | "result";
+
+// ---------------- Quiz history (graphical) ----------------
+function pctOf(r: QuizRun): number {
+  return r.total > 0 ? Math.max(0, Math.min(100, Math.round((r.score / r.total) * 100))) : 0;
+}
+
+const pctBar = (pct: number) => (pct >= 70 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-500" : "bg-rose-500");
+const pctFill = (pct: number) => (pct >= 70 ? "fill-emerald-500" : pct >= 50 ? "fill-amber-500" : "fill-rose-500");
+const pctChip = (pct: number) =>
+  pct >= 70
+    ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+    : pct >= 50
+      ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+      : "bg-rose-500/15 text-rose-600 dark:text-rose-400";
+
+/** Tiny area chart of recent quiz scores (oldest → newest, left → right). */
+function QuizSparkline({ runs }: { runs: { pct: number }[] }) {
+  const w = 100;
+  const h = 34;
+  const n = runs.length;
+  if (n < 2) return null;
+  const pts = runs.map((r, i) => [2 + (i / (n - 1)) * (w - 4), h - 4 - (r.pct / 100) * (h - 8)] as const);
+  const line = pts.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)} ${y.toFixed(1)}`).join(" ");
+  const area = `${line} L${pts[n - 1][0].toFixed(1)} ${h} L${pts[0][0].toFixed(1)} ${h} Z`;
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="h-16 w-full" role="img" aria-label="روند نمرات آزمون">
+      <defs>
+        <linearGradient id="qh-fill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.32" />
+          <stop offset="100%" stopColor="var(--primary)" stopOpacity="0.02" />
+        </linearGradient>
+      </defs>
+      <path d={area} fill="url(#qh-fill)" />
+      <path d={line} fill="none" stroke="var(--primary)" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+      {pts.map(([x, y], i) => (
+        <circle key={i} cx={x} cy={y} r={i === n - 1 ? 2.4 : 1.5} className={i === n - 1 ? "fill-primary" : pctFill(runs[i].pct)} />
+      ))}
+    </svg>
+  );
+}
+
+function QuizHistoryCard({ runs }: { runs: QuizRun[] }) {
+  const [showAll, setShowAll] = useState(false);
+  // runs arrive newest-first; the chart reads chronologically
+  const chart = useMemo(() => [...runs].slice(0, 14).reverse().map((r) => ({ pct: pctOf(r) })), [runs]);
+  const list = useMemo(() => runs.map((r) => ({ ...r, pct: pctOf(r) })), [runs]);
+  const stats = useMemo(() => {
+    const pcts = list.map((r) => r.pct);
+    return {
+      avg: pcts.length ? Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length) : 0,
+      best: pcts.length ? Math.max(...pcts) : 0,
+    };
+  }, [list]);
+  const shown = showAll ? list : list.slice(0, 4);
+
+  return (
+    <section className="rounded-2xl border bg-card p-4 shadow-sm">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="flex items-center gap-2 text-[15px] font-bold">
+          <Trophy className="h-4.5 w-4.5 text-amber-500" /> تاریخچه آزمون‌ها
+        </h2>
+        <span className="rounded-lg bg-muted px-2 py-0.5 text-[11px] font-bold text-muted-foreground">
+          {faNum(runs.length)} آزمون
+        </span>
+      </div>
+
+      <div className="mb-3 grid grid-cols-3 gap-2">
+        <div className="rounded-xl bg-muted/50 p-2.5 text-center">
+          <TrendingUp className="mx-auto h-4 w-4 text-primary" />
+          <div className="mt-1 text-base font-black">{faNum(stats.avg)}٪</div>
+          <div className="text-[10px] text-muted-foreground">میانگین</div>
+        </div>
+        <div className="rounded-xl bg-muted/50 p-2.5 text-center">
+          <Award className="mx-auto h-4 w-4 text-amber-500" />
+          <div className="mt-1 text-base font-black">{faNum(stats.best)}٪</div>
+          <div className="text-[10px] text-muted-foreground">بهترین نتیجه</div>
+        </div>
+        <div className="rounded-xl bg-muted/50 p-2.5 text-center">
+          <ClipboardCheck className="mx-auto h-4 w-4 text-teal-600 dark:text-teal-400" />
+          <div className="mt-1 text-base font-black">{faNum(runs.length)}</div>
+          <div className="text-[10px] text-muted-foreground">آزمون داده‌شده</div>
+        </div>
+      </div>
+
+      <div className="rounded-xl bg-muted/40 p-2.5">
+        <p className="mb-1 text-[10px] font-semibold text-muted-foreground">روند نمرات (۱۴ آزمون اخیر)</p>
+        <QuizSparkline runs={chart} />
+        {chart.length < 2 && (
+          <p className="py-3 text-center text-[11px] text-muted-foreground">
+            با دو آزمون، نمودار پیشرفت شما اینجا نمایش داده می‌شود
+          </p>
+        )}
+      </div>
+
+      <div className="mt-3 space-y-2">
+        {shown.map((h, i) => (
+          <div key={`${h.at}-${i}`} className="rounded-xl bg-muted/50 p-3">
+            <div className="flex items-center gap-3">
+              <span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-xl text-xs font-black", pctChip(h.pct))}>
+                {faNum(h.pct)}٪
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-semibold">{h.label}</span>
+                <span className="block text-[11px] text-muted-foreground" dir="ltr">
+                  {new Date(h.at).toLocaleDateString("fa-IR")}
+                </span>
+              </span>
+              <span className="shrink-0 text-xs text-muted-foreground">{faNum(h.score)}/{faNum(h.total)}</span>
+            </div>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-background/70">
+              <div className={cn("h-full rounded-full", pctBar(h.pct))} style={{ width: `${h.pct}%` }} />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {list.length > 4 && (
+        <button
+          onClick={() => {
+            void tapHaptic();
+            setShowAll((v) => !v);
+          }}
+          className="mt-3 flex min-h-[40px] w-full items-center justify-center gap-1.5 rounded-xl border border-border/70 text-xs font-bold text-primary transition-colors hover:bg-primary/5"
+        >
+          {showAll ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          {showAll ? "نمایش کمتر" : `نمایش همه ${faNum(list.length)} آزمون`}
+        </button>
+      )}
+    </section>
+  );
+}
 
 export function QuizView({ data, navigate }: { data: AppData; navigate: (r: Route) => void }) {
   const { quizHistory, addQuizRun, mistakes, addMistake, read, clearMistakes } = useAppStore();
@@ -341,6 +472,9 @@ export function QuizView({ data, navigate }: { data: AppData; navigate: (r: Rout
         </button>
       </section>
 
+      {/* history — graphical, expandable, near the top so it is easy to reach */}
+      {quizHistory.length > 0 && <QuizHistoryCard runs={quizHistory} />}
+
       {/* by category */}
       <section className="rounded-2xl border bg-card p-4 shadow-sm">
         <h2 className="mb-3 text-[15px] font-bold">آزمون از یک دسته‌بندی</h2>
@@ -363,39 +497,6 @@ export function QuizView({ data, navigate }: { data: AppData; navigate: (r: Rout
           ))}
         </div>
       </section>
-
-      {/* history */}
-      {quizHistory.length > 0 && (
-        <section className="rounded-2xl border bg-card p-4 shadow-sm">
-          <h2 className="mb-3 flex items-center gap-2 text-[15px] font-bold">
-            <Trophy className="h-4.5 w-4.5 text-amber-500" /> آزمون‌های اخیر
-          </h2>
-          <div className="space-y-2">
-            {quizHistory.slice(0, 6).map((h, i) => {
-              const pct = h.total > 0 ? Math.max(0, Math.min(100, Math.round((h.score / h.total) * 100))) : 0;
-              return (
-                <div key={i} className="flex items-center gap-3 rounded-xl bg-muted/50 p-3">
-                  <span className={cn(
-                    "grid h-9 w-9 shrink-0 place-items-center rounded-xl text-xs font-black",
-                    pct >= 70 ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
-                      : pct >= 50 ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
-                      : "bg-rose-500/15 text-rose-600 dark:text-rose-400"
-                  )}>
-                    {faNum(pct)}٪
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold">{h.label}</span>
-                    <span className="block text-[11px] text-muted-foreground" dir="ltr">
-                      {new Date(h.at).toLocaleDateString("fa-IR")}
-                    </span>
-                  </span>
-                  <span className="shrink-0 text-xs text-muted-foreground">{faNum(h.score)}/{faNum(h.total)}</span>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      )}
     </div>
   );
 }
