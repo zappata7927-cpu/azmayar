@@ -97,6 +97,11 @@
   }
   html {
     scroll-behavior: smooth;
+    /* Android Chromium "font boosting" inflates text when any block overflows the
+       viewport width (e.g. a long unwrappable label), making pages look zoomed and
+       misaligned. Locking the text size fixes it app-wide. */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
   body {
     @apply bg-background text-foreground;

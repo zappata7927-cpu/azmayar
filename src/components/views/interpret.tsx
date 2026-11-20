@@ -41,9 +41,13 @@ function NumInput({ value, onChange, unit, label, refLabel }: {
 }) {
   return (
     <div>
-      <div className="mb-1 flex items-center justify-between gap-2">
-        <label className="text-[13px] font-bold leading-6">{label}</label>
-        <span className="shrink-0 text-[10px] text-muted-foreground">مرجع: {refLabel}</span>
+      <div className="mb-1 flex items-start justify-between gap-2">
+        <label className="min-w-0 text-[13px] font-bold leading-6">{label}</label>
+        {/* capped width + wrapping so a long reference range can never overflow the row
+            (overflow used to trigger Android font boosting on the whole page) */}
+        <span className="max-w-[48%] text-left text-[10px] leading-4 text-muted-foreground">
+          مرجع: {refLabel}
+        </span>
       </div>
       <div className="relative">
         <input
@@ -73,8 +77,8 @@ function ResultCard({ label, unit, value, refLabel, r }: { label: string; unit: 
         <span className="text-xs text-muted-foreground" dir="ltr">{faNum(value)} {unit}</span>
         <span className="text-[10px] text-muted-foreground/70">مرجع: {refLabel}</span>
       </div>
-      <p className={cn("mt-2 text-[13px] font-bold", st.text)}>{label}</p>
-      <p className="mt-1 text-[13px] leading-7 text-foreground/85">{r.detail}</p>
+      <p className={cn("mt-2 break-words text-[13px] font-bold", st.text)}>{label}</p>
+      <p className="mt-1 break-words text-[13px] leading-7 text-foreground/85">{r.detail}</p>
       {r.advice.length > 0 && (
         <ul className="mt-2 space-y-1.5 rounded-xl bg-muted/50 p-3">
           {r.advice.map((a, i) => (
@@ -237,7 +241,7 @@ export function InterpretView({ data }: { data: AppData; navigate?: unknown }) {
                 <p className="flex items-center gap-2 text-sm font-black">
                   <ShieldAlert className="h-4.5 w-4.5" /> خلاصه تفسیر
                 </p>
-                <p className="mt-1.5 text-[13px] leading-7">{result.summary}</p>
+                <p className="mt-1.5 break-words text-[13px] leading-7">{result.summary}</p>
               </div>
 
               {result.patterns.map((p, i) => (
@@ -245,7 +249,7 @@ export function InterpretView({ data }: { data: AppData; navigate?: unknown }) {
                   <p className="flex items-center gap-2 text-sm font-black">
                     <Info className="h-4.5 w-4.5" /> {p.title}
                   </p>
-                  <p className="mt-1.5 text-[13px] leading-7">{p.detail}</p>
+                  <p className="mt-1.5 break-words text-[13px] leading-7">{p.detail}</p>
                 </div>
               ))}
 
@@ -257,7 +261,7 @@ export function InterpretView({ data }: { data: AppData; navigate?: unknown }) {
                 <p className="mb-1.5 flex items-center gap-1.5 text-[13px] font-black text-amber-700 dark:text-amber-400">
                   <AlertTriangle className="h-4 w-4" /> سلب مسئولیت
                 </p>
-                <p className="text-xs leading-6 text-foreground/80">{INTERPRETATION_DISCLAIMER}</p>
+                <p className="break-words text-xs leading-6 text-foreground/80">{INTERPRETATION_DISCLAIMER}</p>
               </div>
             </div>
           )}

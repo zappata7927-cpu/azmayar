@@ -88,7 +88,8 @@ export async function pullWidgetState(): Promise<number> {
         toast.success("تغییرات ویجت صفحه اصلی اعمال شد ✓");
       }
       return merged;
-    } catch {
+    } catch (e) {
+      console.warn("[widget-sync] pull failed:", e);
       return 0;
     }
   });
@@ -123,6 +124,13 @@ export function initWidgetSync(): () => void {
   };
   document.addEventListener("visibilitychange", onVisible);
 
+  // safety net: while the app is visible, poll the native state every few seconds so
+  // widget answers reach the app even if every event path (visibility, appStateChange,
+  // native onResume) fails to fire
+  const poll = setInterval(() => {
+    if (document.visibilityState === "visible") void pullWidgetState();
+  }, 8000);
+
   const appSub = App.addListener("appStateChange", (s) => {
     if (s.isActive) void pullWidgetState();
     else void pushWidgetState();
@@ -141,6 +149,7 @@ export function initWidgetSync(): () => void {
 
   return () => {
     unsub();
+    clearInterval(poll);
     document.removeEventListener("visibilitychange", onVisible);
     void Promise.resolve(appSub)
       .then((h) => h.remove())
