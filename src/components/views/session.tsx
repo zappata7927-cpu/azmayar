@@ -26,6 +26,8 @@ import { faNum, cn } from "@/lib/utils";
 import { tapHaptic } from "@/lib/haptics";
 
 const QUESTION_SECONDS = 60;
+/** minimum quiz accuracy for the today-plan item to auto-tick (v1.6) */
+const QUIZ_TICK_PCT = 60;
 const OPTION_LETTERS = ["الف", "ب", "ج", "د", "ه", "و"];
 
 const safeAnswer = (q: Question) =>
@@ -52,7 +54,7 @@ interface SessionBoot {
  * ending with a full per-question کارنامه.
  */
 export function SessionView({ data, navigate, route }: { data: AppData; navigate: (r: Route) => void; route: Route }) {
-  const { leitner, answerCard, answerQuestion, addMistake, removeMistake, qstats, mistakes, addQuizRun, togglePlanItem } = useAppStore();
+  const { leitner, answerCard, answerQuestion, addMistake, removeMistake, qstats, mistakes, addQuizRun, completePlanItem } = useAppStore();
 
   const [boot] = useState(() => {
     if (route.v !== "session") return null;
@@ -112,15 +114,20 @@ export function SessionView({ data, navigate, route }: { data: AppData; navigate
   const finish = useCallback(() => {
     if (!boot) return;
     if (boot.kind === "cards") {
-      togglePlanItem(boot.planId);
-      toast.success("آیتم برنامه امروز انجام شد ✓");
+      completePlanItem(boot.planId);
+      toast.success("جلسه مرور تمام شد — در برنامه امروز تیک خورد ✓");
     } else {
       addQuizRun({ at: Date.now(), score, total: boot.questions.length, label: boot.label });
-      togglePlanItem(boot.planId);
-      toast.success("آیتم برنامه امروز انجام شد ✓");
+      const pct = Math.round((score / Math.max(boot.questions.length, 1)) * 100);
+      if (pct >= QUIZ_TICK_PCT) {
+        completePlanItem(boot.planId);
+        toast.success(`دقت ${faNum(pct)}٪ — دسته سؤال‌ها در برنامه امروز تیک خورد ✓`);
+      } else {
+        toast.warning(`دقت ${faNum(pct)}٪ — برای تیک خودکار، حداقل ${faNum(QUIZ_TICK_PCT)}٪ لازم است`);
+      }
     }
     setPhase("done");
-  }, [boot, score, togglePlanItem, addQuizRun]);
+  }, [boot, score, completePlanItem, addQuizRun]);
 
   const advance = useCallback(
     (fromPos: number) => {

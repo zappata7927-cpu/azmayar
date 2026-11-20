@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   FlaskConical,
   Layers,
@@ -13,6 +13,9 @@ import {
   CalendarDays,
   Target,
   Check,
+  Clock3,
+  Lock,
+  RotateCcw,
   Pencil,
   ChevronLeft as GoLeft,
   Shuffle,
@@ -68,6 +71,25 @@ export const GROUP_COLORS: Record<string, string> = {
 function dayIndex(): number {
   const d = new Date();
   return d.getFullYear() * 1000 + d.getMonth() * 40 + d.getDate();
+}
+
+/** cooldown between completing one quiz batch and the next one unlocking (v1.6) */
+const QUIZ_COOLDOWN_MS = 30 * 60 * 1000;
+
+/** ۲۹:۴۱ — Persian-digit countdown for the unlock pill */
+function fmtMmss(ms: number): string {
+  const s = Math.max(0, Math.ceil(ms / 1000));
+  const mm = Math.floor(s / 60);
+  const ss = s % 60;
+  return `${faNum(mm)}:${ss < 10 ? "۰" : ""}${faNum(ss)}`;
+}
+
+/** «۱۴ ساعت و ۲۳ دقیقه» — Persian countdown for the nightly reset line */
+function fmtHm(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 60000));
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  return h > 0 ? `${faNum(h)} ساعت و ${faNum(m)} دقیقه` : `${faNum(m)} دقیقه`;
 }
 
 /** «نکته امروز» — personalized by the chosen goal and topics (v1.5): the pool
@@ -268,6 +290,7 @@ function TodayPlanCard({
   goalSet,
   examDate,
   done,
+  doneAt,
   onToggle,
   onNavigate,
   onPickGoal,
@@ -276,14 +299,86 @@ function TodayPlanCard({
   goalSet: boolean;
   examDate: string | null;
   done: string[];
+  /** itemId → completion epoch ms of today (drives the quiz unlock chain) */
+  doneAt: Record<string, number>;
   onToggle: (id: string) => void;
   onNavigate: (r: Route) => void;
   onPickGoal: () => void;
 }) {
   const doneCount = plan.items.filter((i) => done.includes(i.id)).length;
   const allDone = plan.items.length > 0 && doneCount === plan.items.length;
+
+  // v1.6 quiz unlock chain: quiz batches open one after another — a batch
+  // unlocks QUIZ_COOLDOWN minutes after the previous batch was completed
+  // (auto-ticked at the end of its session). Card reviews and mistake
+  // reviews are never locked.
+  const [now, setNow] = useState(Date.now());
+  const quizItems = plan.items.filter((it) => it.kind === "quiz");
+  const lockInfo = new Map<string, { locked: boolean; unlockAt: number | null; waitPrev: boolean }>();
+  {
+    let prevDone = true;
+    let prevDoneAt: number | null = null;
+    for (const it of quizItems) {
+      let waitPrev = false;
+      let unlockAt: number | null = null;
+      if (!prevDone) {
+        waitPrev = true;
+      } else if (prevDoneAt !== null) {
+        const at = prevDoneAt + QUIZ_COOLDOWN_MS;
+        if (now < at) unlockAt = at;
+      }
+      lockInfo.set(it.id, { locked: waitPrev || unlockAt !== null, unlockAt, waitPrev });
+      if (done.includes(it.id)) {
+        prevDone = true;
+        prevDoneAt = typeof doneAt[it.id] === "number" ? doneAt[it.id] : null;
+      } else {
+        prevDone = false;
+        prevDoneAt = null;
+      }
+    }
+  }
+  const nextUnlockAt =
+    [...lockInfo.values()]
+      .map((l) => l.unlockAt)
+      .filter((t): t is number => t !== null)
+      .sort((a, b) => a - b)[0] ?? null;
+  const allQuizDone = quizItems.length >= 2 && quizItems.every((it) => done.includes(it.id));
+  const msToMidnight = (() => {
+    const d = new Date(now);
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1, 0, 0, 0, 0).getTime() - d.getTime();
+  })();
+
+  // live ticker for the unlock/reset countdowns — runs only while one is on screen
+  const ticking = nextUnlockAt !== null || allDone;
+  useEffect(() => {
+    if (!ticking) return;
+    const iv = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(iv);
+  }, [ticking]);
+
   const row = (item: PlanItem) => {
     const isDone = done.includes(item.id);
+    const lock = item.kind === "quiz" ? lockInfo.get(item.id) : undefined;
+    if (lock?.locked && !isDone) {
+      return (
+        <div key={item.id} className="flex items-center gap-3 rounded-2xl border border-dashed border-border bg-muted/30 p-3">
+          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground">
+            <Lock className="h-3.5 w-3.5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <span className="block text-sm font-bold text-muted-foreground">{item.title}</span>
+            <span className="block truncate text-[11px] text-muted-foreground/75">{item.detail}</span>
+          </div>
+          {lock.unlockAt !== null ? (
+            <span className="flex shrink-0 items-center gap-1 rounded-lg bg-sky-500/15 px-2 py-1 text-[10px] font-black text-sky-700 tabular-nums dark:text-sky-300">
+              <Clock3 className="h-3 w-3" /> {fmtMmss(lock.unlockAt - now)}
+            </span>
+          ) : (
+            <span className="shrink-0 rounded-lg bg-muted px-2 py-1 text-[10px] font-black text-muted-foreground">ابتدا دسته قبل</span>
+          )}
+        </div>
+      );
+    }
     return (
       <div
         key={item.id}
@@ -363,6 +458,16 @@ function TodayPlanCard({
             {plan.daysLeft === 0 ? "آزمون نزدیک است!" : `${faNum(plan.daysLeft)} روز مانده`}
           </span>
         )}
+        {nextUnlockAt !== null && (
+          <span className="flex items-center gap-1 rounded-lg bg-sky-500/15 px-2 py-0.5 text-[10px] font-black text-sky-700 tabular-nums dark:text-sky-300">
+            <Clock3 className="h-3 w-3" /> دسته بعدی: {fmtMmss(nextUnlockAt - now)}
+          </span>
+        )}
+        {allQuizDone && (
+          <span className="rounded-lg bg-emerald-500/15 px-2 py-0.5 text-[10px] font-black text-emerald-700 dark:text-emerald-300">
+            همه دسته‌های آزمون باز شد ✓
+          </span>
+        )}
         <span className="mr-auto flex items-center gap-1.5">
           <button
             onClick={onPickGoal}
@@ -385,9 +490,15 @@ function TodayPlanCard({
       </div>
       <div className="space-y-2">{plan.items.length ? plan.items.map(row) : <p className="py-3 text-center text-xs text-muted-foreground">برنامه‌ای ساخته نشد — چند مطلب مطالعه کنید تا برنامه فعال شود.</p>}</div>
       {allDone && (
-        <p className="mt-3 rounded-xl bg-emerald-500/10 p-2.5 text-center text-xs font-bold text-emerald-700 dark:text-emerald-300">
-          برنامه امروز کامل شد ✓ عالی بود!
-        </p>
+        <div className="mt-3 space-y-2">
+          <p className="rounded-xl bg-emerald-500/10 p-2.5 text-center text-xs font-bold text-emerald-700 dark:text-emerald-300">
+            برنامه امروز کامل شد ✓ عالی بود!
+          </p>
+          <p className="flex items-center justify-center gap-1.5 rounded-xl bg-sky-500/10 p-2.5 text-center text-[11px] font-bold text-sky-700 dark:text-sky-300">
+            <RotateCcw className="h-3.5 w-3.5 shrink-0" />
+            ریست برنامه و آزمون بعدی: فردا ۰۰:۰۰ — {fmtHm(msToMidnight)} دیگر
+          </p>
+        </div>
       )}
       <p className="mt-3 text-[11px] leading-6 text-muted-foreground">{plan.note}</p>
     </section>
@@ -397,7 +508,7 @@ function TodayPlanCard({
 export function HomeView({ data, navigate }: {  data: AppData;
   navigate: (r: Route) => void;
 }) {
-  const { lastTest, favorites, leitner, qstats, mistakes, settings, studyGoal, planDone, togglePlanItem } = useAppStore();
+  const { lastTest, favorites, leitner, qstats, mistakes, settings, studyGoal, planDone, planDoneAt, togglePlanItem } = useAppStore();
   const activity = useActivityMedal();
   const [goalOpen, setGoalOpen] = useState(false);
   const last = useMemo(() => data.tests.find((t) => t.id === lastTest), [data.tests, lastTest]);
@@ -458,6 +569,7 @@ export function HomeView({ data, navigate }: {  data: AppData;
         goalSet={!!studyGoal.goal}
         examDate={studyGoal.examDate}
         done={doneToday}
+        doneAt={planDoneAt[planDayKey()] ?? {}}
         onToggle={togglePlanItem}
         onNavigate={navigate}
         onPickGoal={() => setGoalOpen(true)}

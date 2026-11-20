@@ -71,6 +71,9 @@ interface AppState {
   studyGoal: StudyGoal;
   /** "YYYY-MM-DD" → ids of today-plan items the user checked off */
   planDone: Record<string, string[]>;
+  /** "YYYY-MM-DD" → itemId → epoch ms the item was completed (drives the
+   *  quiz-batch unlock countdown chain of the today plan) */
+  planDoneAt: Record<string, Record<string, number>>;
   settings: Settings;
   toggleFav: (id: string) => void;
   markRead: (id: string) => void;
@@ -83,6 +86,10 @@ interface AppState {
   answerQuestion: (id: string, good: boolean) => void;
   setStudyGoal: (g: Partial<StudyGoal>) => void;
   togglePlanItem: (itemId: string) => void;
+  /** auto-check a today-plan item after its session finished successfully:
+   *  only ever ticks (never unticks) and records the completion time so the
+   *  next quiz batch can unlock after a cooldown */
+  completePlanItem: (itemId: string) => void;
   clearMistakes: () => void;
   setSettings: (s: Partial<Settings>) => void;
   resetLeitner: () => void;
@@ -168,6 +175,16 @@ function sanitize(st: Partial<AppState> | undefined): Partial<AppState> {
     }
   }
   out.planDone = planDone;
+  const planDoneAt: Record<string, Record<string, number>> = {};
+  if (st.planDoneAt && typeof st.planDoneAt === "object") {
+    for (const [k, v] of Object.entries(st.planDoneAt)) {
+      if (!v || typeof v !== "object") continue;
+      const day: Record<string, number> = {};
+      for (const [id, t] of Object.entries(v)) if (typeof t === "number") day[id] = t;
+      planDoneAt[k] = day;
+    }
+  }
+  out.planDoneAt = planDoneAt;
   out.settings =
     st.settings && typeof st.settings === "object"
       ? { ...DEFAULT_SETTINGS, ...st.settings, fontSize: st.settings.fontSize ?? "md", dailyCards: Number(st.settings.dailyCards) || 10, theme: st.settings.theme === "dark" || st.settings.theme === "light" ? st.settings.theme : "system" }
@@ -188,6 +205,7 @@ export const useAppStore = create<AppState>()(
       qstats: {},
       studyGoal: { goal: null, examDate: null, focus: null },
       planDone: {},
+      planDoneAt: {},
       settings: DEFAULT_SETTINGS,
       toggleFav: (id) =>
         set((st) => ({
@@ -253,11 +271,21 @@ export const useAppStore = create<AppState>()(
           const next = cur.includes(itemId) ? cur.filter((x) => x !== itemId) : [...cur, itemId];
           return { planDone: { ...st.planDone, [key]: next } };
         }),
+      completePlanItem: (itemId) =>
+        set((st) => {
+          const key = planDayKey();
+          const cur = st.planDone[key] ?? [];
+          if (cur.includes(itemId)) return st;
+          return {
+            planDone: { ...st.planDone, [key]: [...cur, itemId].slice(0, 30) },
+            planDoneAt: { ...st.planDoneAt, [key]: { ...(st.planDoneAt[key] ?? {}), [itemId]: Date.now() } },
+          };
+        }),
       clearMistakes: () => set({ mistakes: {} }),
       setSettings: (s) => set((st) => ({ settings: { ...st.settings, ...s } })),
       resetLeitner: () => set({ leitner: {}, leitnerResetAt: Date.now() }),
       resetAll: () =>
-        set({ favorites: [], read: [], lastTest: null, leitner: {}, leitnerResetAt: Date.now(), quizHistory: [], mistakes: {}, qstats: {}, planDone: {} }),
+        set({ favorites: [], read: [], lastTest: null, leitner: {}, leitnerResetAt: Date.now(), quizHistory: [], mistakes: {}, qstats: {}, planDone: {}, planDoneAt: {} }),
       mergeLeitnerFromWidget: (native) => {
         if (!native || typeof native !== "object") return 0;
         const st = get();
@@ -289,7 +317,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: "azmayar-store-v1",
-      version: 3,
+      version: 4,
       migrate: (persisted) => sanitize(persisted as Partial<AppState>),
       merge: (persisted, current) => ({ ...current, ...sanitize(persisted as Partial<AppState>) }),
     }
