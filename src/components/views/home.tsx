@@ -9,7 +9,6 @@ import {
   Star,
   ChevronLeft,
   Sparkles,
-  GraduationCap,
   Lightbulb,
   Shuffle,
   ChevronLeft as ArrowLeftIcon,
@@ -24,6 +23,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { AppData } from "@/lib/types";
+import { assetUrl } from "@/lib/types";
 import type { Route } from "@/lib/nav";
 import { useAppStore } from "@/lib/store";
 import { useActivityMedal, type Activity as ActivityInfo } from "@/lib/achievements";
@@ -211,37 +211,28 @@ export function HomeView({ data, navigate }: {  data: AppData;
 
   return (
     <div className="space-y-5">
-      {/* Hero */}
-      <section className="hero-aurora relative overflow-hidden rounded-3xl p-5 text-white shadow-lg">
-        <div className="absolute -left-10 -top-10 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
-        <div className="absolute -bottom-14 -right-6 h-44 w-44 rounded-full bg-white/10 blur-2xl" />
-        <div className="relative">
-          <div className="flex items-center gap-2 text-xs font-semibold text-white/85">
-            <Sparkles className="h-3.5 w-3.5" />
-            اپلیکیشن آموزشی کادر درمان و دانشجویان علوم پزشکی
+      {/* Compact brand bar — the old tall hero was slimmed down (v1.2.7) to
+          keep the home page uncluttered; the medal card below is the anchor */}
+      <section className="hero-aurora relative overflow-hidden rounded-2xl px-4 py-3 text-white shadow-sm">
+        <div className="relative flex items-center gap-3">
+          <img src={assetUrl("/icons/icon-64.png")} alt="" className="h-10 w-10 shrink-0 rounded-xl shadow-md" />
+          <div className="min-w-0 flex-1">
+            <div className="text-[15px] font-black leading-6">آزمـیار</div>
+            <div className="truncate text-[11px] text-white/80">آموزش و تفسیر آزمایش‌های آزمایشگاهی</div>
           </div>
-          <h1 className="mt-1.5 text-[1.65rem] font-black leading-snug">
-            آزمایش‌های آزمایشگاهی را اصولی بیاموزید
-          </h1>
-          <p className="mt-2 text-sm leading-6 text-white/85">
-            مرجع کامل تفسیر آزمایش‌ها با دسته‌بندی موضوعی، جعبه لایتنر برای مرور هوشمند و آزمون از مباحث خوانده‌شده
-          </p>
-          <div className="mt-4 grid grid-cols-3 gap-2">
-            {stats.map((s) => (
-              <button
-                key={s.label}
-                onClick={s.href}
-                className="rounded-2xl bg-white/12 p-3 text-center backdrop-blur-sm transition-colors hover:bg-white/20"
-              >
-                <div className="text-lg font-black">{faNum(s.value)}</div>
-                <div className="mt-0.5 text-[11px] font-semibold text-white/85">{s.label}</div>
-              </button>
-            ))}
-          </div>
-          <div className="mt-4 flex items-center gap-2 rounded-2xl bg-white/10 p-2.5 text-[11px] leading-5 text-white/90">
-            <GraduationCap className="h-4 w-4 shrink-0" />
-            مرجع کامل تفاسیر آزمایش‌های تشخیصی برای کادر درمان و دانشجویان
-          </div>
+          <Sparkles className="h-4 w-4 shrink-0 text-white/70" />
+        </div>
+        <div className="relative mt-2.5 grid grid-cols-3 gap-2">
+          {stats.map((s) => (
+            <button
+              key={s.label}
+              onClick={s.href}
+              className="rounded-xl bg-white/10 py-1.5 text-center backdrop-blur-sm transition-colors active:bg-white/25"
+            >
+              <span className="text-sm font-black">{faNum(s.value)}</span>
+              <span className="mr-1 text-[10px] font-semibold text-white/85">{s.label}</span>
+            </button>
+          ))}
         </div>
       </section>
 

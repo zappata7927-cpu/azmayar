@@ -201,25 +201,37 @@ public class LeitnerWidgetProvider extends AppWidgetProvider {
         }
     }
 
-    // merge two state JSONs: newest updatedAt wins per card
+    // merge two state JSONs: newest updatedAt wins per card.
+    // A "__resetAt" marker (epoch ms) tombstones a deliberate app-side Leitner
+    // reset: cards whose updatedAt is not strictly after the reset instant are
+    // dropped, so the widget's stale snapshot can never resurrect cleared
+    // progress (v1.2.7). Cards answered on the widget AFTER the reset still win.
     public static String mergeStates(String base, String incoming) {
         try {
             JSONObject a = new JSONObject(base == null ? "{}" : base);
             JSONObject b = new JSONObject(incoming == null ? "{}" : incoming);
+            long resetAt = Math.max(a.optLong("__resetAt", 0), b.optLong("__resetAt", 0));
+            JSONObject out = new JSONObject();
+            // keep only base cards that were answered after the reset instant
+            for (java.util.Iterator<String> it = a.keys(); it.hasNext(); ) {
+                String id = it.next();
+                if ("__resetAt".equals(id)) continue;
+                JSONObject oa = a.optJSONObject(id);
+                if (oa == null) continue;
+                if (oa.optLong("updatedAt", 0) > resetAt) out.put(id, oa);
+            }
+            // overlay incoming cards, newest updatedAt wins (same tie-breaking as before)
             for (java.util.Iterator<String> it = b.keys(); it.hasNext(); ) {
                 String id = it.next();
+                if ("__resetAt".equals(id)) continue;
                 JSONObject nb = b.optJSONObject(id);
                 if (nb == null) continue;
-                JSONObject oa = a.optJSONObject(id);
-                long upd = nb.optLong("updatedAt", 0);
-                if (oa == null) {
-                    a.put(id, nb);
-                } else {
-                    long oldUpd = oa.optLong("updatedAt", 0);
-                    if (upd >= oldUpd) a.put(id, nb);
-                }
+                if (nb.optLong("updatedAt", 0) <= resetAt) continue;
+                JSONObject cur = out.optJSONObject(id);
+                if (cur == null || nb.optLong("updatedAt", 0) >= cur.optLong("updatedAt", 0)) out.put(id, nb);
             }
-            return a.toString();
+            if (resetAt > 0) out.put("__resetAt", resetAt);
+            return out.toString();
         } catch (Exception e) {
             return base == null ? "{}" : base;
         }

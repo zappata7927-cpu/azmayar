@@ -34,7 +34,7 @@ export const MEDAL_TIERS: MedalTier[] = [
     key: "bronze",
     name: "مدال برنزی",
     emoji: "🥉",
-    min: 120,
+    min: 250,
     grad: "from-orange-600 to-amber-400",
     bg: "bg-gradient-to-bl from-amber-100/70 to-orange-100/40 dark:from-amber-950/40 dark:to-orange-950/30",
     border: "border-amber-500/35",
@@ -45,7 +45,7 @@ export const MEDAL_TIERS: MedalTier[] = [
     key: "silver",
     name: "مدال نقره‌ای",
     emoji: "🥈",
-    min: 350,
+    min: 750,
     grad: "from-slate-400 to-zinc-200",
     bg: "bg-gradient-to-bl from-slate-100/70 to-zinc-100/40 dark:from-slate-800/50 dark:to-zinc-900/40",
     border: "border-slate-400/40",
@@ -56,7 +56,7 @@ export const MEDAL_TIERS: MedalTier[] = [
     key: "gold",
     name: "مدال طلایی",
     emoji: "🥇",
-    min: 700,
+    min: 1500,
     grad: "from-amber-500 to-yellow-300",
     bg: "bg-gradient-to-bl from-yellow-100/70 to-amber-100/40 dark:from-yellow-950/40 dark:to-amber-950/30",
     border: "border-amber-500/45",
@@ -67,7 +67,7 @@ export const MEDAL_TIERS: MedalTier[] = [
     key: "platinum",
     name: "مدال پلاتینی",
     emoji: "💎",
-    min: 1200,
+    min: 2600,
     grad: "from-cyan-500 to-teal-300",
     bg: "bg-gradient-to-bl from-cyan-100/70 to-teal-100/40 dark:from-cyan-950/40 dark:to-teal-950/30",
     border: "border-cyan-500/40",
@@ -78,7 +78,7 @@ export const MEDAL_TIERS: MedalTier[] = [
     key: "legend",
     name: "افسانه آزمایشگاه",
     emoji: "👑",
-    min: 2000,
+    min: 4200,
     grad: "from-violet-500 to-fuchsia-400",
     bg: "bg-gradient-to-bl from-violet-100/70 to-fuchsia-100/40 dark:from-violet-950/40 dark:to-fuchsia-950/30",
     border: "border-violet-500/45",
@@ -130,10 +130,11 @@ export function computeActivity(
   const quizBest = quizRuns ? Math.max(...pcts) : 0;
 
   // transparent scoring: study 5/lesson, review 2/card, +5 per mastered card,
-  // quizzes 20/run plus up to 40 bonus from the average score
+  // quizzes 10/run plus up to 25 bonus from the average score — deliberately
+  // slow so a medal always reflects sustained effort, not two quick quizzes
   const studyPts = readCount * 5;
   const cardPts = cardsSeen * 2 + mastered * 5;
-  const quizPts = quizRuns * 20 + Math.round((quizAvg / 100) * 40);
+  const quizPts = quizRuns * 10 + Math.round((quizAvg / 100) * 25);
   const points = studyPts + cardPts + quizPts;
 
   let tierIndex = 0;

@@ -56,6 +56,7 @@ import { InterpretView } from "@/components/views/interpret";
 import { ViewErrorBoundary } from "@/components/error-boundary";
 import { initWidgetSync, pullWidgetState, isNativeApp } from "@/lib/widget-bridge";
 import { initReminder } from "@/lib/reminder";
+import { tapHaptic } from "@/lib/haptics";
 import { App } from "@capacitor/app";
 import { cn, faNum } from "@/lib/utils";
 
@@ -201,6 +202,8 @@ function SettingsSheet({ data }: { data: AppData }) {
   const { theme, setTheme } = useTheme();
   const { settings, setSettings, resetLeitner, resetAll, favorites, read } = useAppStore();
   const [mounted, setMounted] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [wipeOpen, setWipeOpen] = useState(false);
   useEffect(() => {
     const id = window.setTimeout(() => setMounted(true), 0);
     return () => window.clearTimeout(id);
@@ -273,27 +276,61 @@ function SettingsSheet({ data }: { data: AppData }) {
             <p>مطالب خوانده‌شده: {faNum(read.length)}</p>
             <p>علاقه‌مندی‌ها: {faNum(favorites.length)}</p>
           </div>
-          <Button
-            variant="outline"
-            className="w-full rounded-xl"
-            onClick={() => {
-              resetLeitner();
-              toast.success("پیشرفت جعبه لایتنر صفر شد");
-            }}
-          >
+          <Button variant="outline" className="w-full rounded-xl" onClick={() => setResetOpen(true)}>
             <RotateCcw className="h-4 w-4" /> بازنشانی جعبه لایتنر
           </Button>
-          <Button
-            variant="destructive"
-            className="w-full rounded-xl"
-            onClick={() => {
-              resetAll();
-              toast.success("همه داده‌های کاربر پاک شد");
-            }}
-          >
+          <Button variant="destructive" className="w-full rounded-xl" onClick={() => setWipeOpen(true)}>
             <X className="h-4 w-4" /> پاک کردن همه داده‌های من
           </Button>
         </div>
+
+        {/* confirm before resetting Leitner progress — destructive and irreversible */}
+        <AlertDialog open={resetOpen} onOpenChange={setResetOpen}>
+          <AlertDialogContent className="max-w-xs rounded-2xl">
+            <AlertDialogHeader className="items-center text-center">
+              <AlertDialogTitle className="text-base">بازنشانی جعبه لایتنر</AlertDialogTitle>
+              <AlertDialogDescription className="text-center text-[13px] leading-6">
+                آیا واقعاً می‌خواهید اطلاعات جعبه لایتنر را ریست کنید؟ همه کارت‌ها به حالت «جدید» برمی‌گردند و پیشرفت فعلی قابل بازگشت نیست.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="flex-row-reverse gap-2 sm:justify-center">
+              <AlertDialogCancel className="mt-0 rounded-xl">انصراف</AlertDialogCancel>
+              <AlertDialogAction
+                className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => {
+                  resetLeitner();
+                  toast.success("پیشرفت جعبه لایتنر صفر شد");
+                }}
+              >
+                ریست کن
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* confirm before wiping everything (favorites, read, history, leitner…) */}
+        <AlertDialog open={wipeOpen} onOpenChange={setWipeOpen}>
+          <AlertDialogContent className="max-w-xs rounded-2xl">
+            <AlertDialogHeader className="items-center text-center">
+              <AlertDialogTitle className="text-base">پاک کردن همه داده‌ها</AlertDialogTitle>
+              <AlertDialogDescription className="text-center text-[13px] leading-6">
+                این کار علاقه‌مندی‌ها، مطالب خوانده‌شده، تاریخچه آزمون‌ها و پیشرفت لایتنر را برای همیشه پاک می‌کند. مطمئنید؟
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="flex-row-reverse gap-2 sm:justify-center">
+              <AlertDialogCancel className="mt-0 rounded-xl">انصراف</AlertDialogCancel>
+              <AlertDialogAction
+                className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => {
+                  resetAll();
+                  toast.success("همه داده‌های کاربر پاک شد");
+                }}
+              >
+                پاک کن
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </SheetContent>
     </Sheet>
   );
@@ -352,6 +389,19 @@ export function AppShell() {
       backSub?.remove();
       resumeSub?.remove();
     };
+  }, []);
+
+  // one subtle haptic tick for EVERY pressable element in the app — bottom nav,
+  // top-bar search/settings, cards, dialogs… — without wiring each button by
+  // hand; direct tapHaptic() calls elsewhere are collapsed by its throttle
+  useEffect(() => {
+    if (!isNativeApp()) return;
+    const onDown = (e: PointerEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el && el.closest("button, [role='button'], a, summary")) void tapHaptic();
+    };
+    document.addEventListener("pointerdown", onDown, { capture: true, passive: true });
+    return () => document.removeEventListener("pointerdown", onDown, { capture: true });
   }, []);
 
   // keep the app in sync with home-screen widget edits on every navigation

@@ -30,6 +30,9 @@ interface AppState {
   read: string[];
   lastTest: string | null;
   leitner: Record<string, LeitnerState>;
+  /** epoch ms of the last deliberate Leitner reset — widget snapshots older than
+   *  this are stale and must never resurrect cleared progress */
+  leitnerResetAt: number;
   quizHistory: QuizRun[];
   mistakes: Record<string, number>;
   settings: Settings;
@@ -72,6 +75,7 @@ function sanitize(st: Partial<AppState> | undefined): Partial<AppState> {
     }
   }
   out.leitner = leitner;
+  out.leitnerResetAt = typeof st.leitnerResetAt === "number" ? st.leitnerResetAt : 0;
   out.quizHistory = Array.isArray(st.quizHistory)
     ? st.quizHistory
         .filter((r) => r && typeof r === "object" && typeof r.score === "number" && typeof r.total === "number")
@@ -99,6 +103,7 @@ export const useAppStore = create<AppState>()(
       read: [],
       lastTest: null,
       leitner: {},
+      leitnerResetAt: 0,
       quizHistory: [],
       mistakes: {},
       settings: DEFAULT_SETTINGS,
@@ -133,12 +138,13 @@ export const useAppStore = create<AppState>()(
         set((st) => ({ mistakes: { ...st.mistakes, [qid]: (st.mistakes[qid] ?? 0) + 1 } })),
       clearMistakes: () => set({ mistakes: {} }),
       setSettings: (s) => set((st) => ({ settings: { ...st.settings, ...s } })),
-      resetLeitner: () => set({ leitner: {} }),
+      resetLeitner: () => set({ leitner: {}, leitnerResetAt: Date.now() }),
       resetAll: () =>
-        set({ favorites: [], read: [], lastTest: null, leitner: {}, quizHistory: [], mistakes: {} }),
+        set({ favorites: [], read: [], lastTest: null, leitner: {}, leitnerResetAt: Date.now(), quizHistory: [], mistakes: {} }),
       mergeLeitnerFromWidget: (native) => {
         if (!native || typeof native !== "object") return 0;
         const st = get();
+        const resetAt = st.leitnerResetAt ?? 0;
         const merged = { ...st.leitner };
         let count = 0;
         for (const [id, nv] of Object.entries(native)) {
@@ -146,6 +152,9 @@ export const useAppStore = create<AppState>()(
           const cur = merged[id];
           const nUpd = typeof nv.updatedAt === "number" ? nv.updatedAt : 0;
           const cUpd = cur?.updatedAt ?? 0;
+          // a deliberate app-side reset tombstones everything older than it: a stale
+          // widget snapshot (or the widget's pre-reset copy) must never come back
+          if (resetAt > 0 && nUpd <= resetAt) continue;
           if (!cur || nUpd > cUpd) {
             merged[id] = {
               box: nv.box,

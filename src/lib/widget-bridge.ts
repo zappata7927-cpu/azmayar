@@ -34,12 +34,17 @@ const LeitnerBridge = registerPlugin<LeitnerBridgePlugin>("LeitnerBridge", {
 
 export const isNativeApp = (): boolean => Capacitor.isNativePlatform();
 
-export function serializeLeitner(st: Record<string, LeitnerState>): string {
+export function serializeLeitner(st: Record<string, LeitnerState>, resetAt = 0): string {
   const out: Record<string, { box: number; due: number; updatedAt: number }> = {};
   for (const [id, s] of Object.entries(st)) {
     if (s && typeof s.due === "number" && typeof s.box === "number") {
       out[id] = { box: s.box, due: s.due, updatedAt: s.updatedAt ?? 0 };
     }
+  }
+  // tombstone marker: lets the native merge drop pre-reset cards instead of
+  // resurrecting them (see LeitnerWidgetProvider.mergeStates)
+  if (resetAt > 0) {
+    (out as Record<string, unknown>)["__resetAt"] = resetAt;
   }
   return JSON.stringify(out);
 }
@@ -100,7 +105,12 @@ export async function pushWidgetState(): Promise<void> {
   if (!isNativeApp() || !firstPullDone) return;
   await queued(async () => {
     try {
-      await LeitnerBridge.saveState({ value: serializeLeitner(useAppStore.getState().leitner) });
+      await LeitnerBridge.saveState({
+        value: serializeLeitner(
+          useAppStore.getState().leitner,
+          useAppStore.getState().leitnerResetAt ?? 0
+        ),
+      });
     } catch {
       // ignore
     }
