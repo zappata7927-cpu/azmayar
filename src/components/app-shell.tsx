@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { cancelReminders, ensureNotifPermission } from "@/lib/notify";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
@@ -306,6 +307,22 @@ function SettingsSheet({ data }: { data: AppData }) {
               step={5}
               onValueChange={(v) => setSettings({ dailyCards: v[0] })}
               className="py-2"
+            />
+          </div>
+          <div className="flex items-center justify-between gap-3 rounded-xl border p-3">
+            <div className="min-w-0">
+              <p className="text-sm font-bold">اعلان‌ها و یادآورها</p>
+              <p className="mt-0.5 text-[11px] leading-5 text-muted-foreground">
+                باز شدن دسته‌های آزمون و یادآور روزانه اگر نیایید
+              </p>
+            </div>
+            <Switch
+              checked={settings.notifications !== false}
+              onCheckedChange={(v) => {
+                setSettings({ notifications: v });
+                if (v) void ensureNotifPermission();
+                else void cancelReminders();
+              }}
             />
           </div>
           <Separator />

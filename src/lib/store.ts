@@ -54,6 +54,8 @@ export interface Settings {
   fontSize: "sm" | "md" | "lg" | "xl";
   dailyCards: number;
   theme: "light" | "dark" | "system";
+  /** v1.6.2: local notification reminders (quiz-batch unlocks + daily absence) */
+  notifications: boolean;
 }
 
 interface AppState {
@@ -99,7 +101,7 @@ interface AppState {
   mergeLeitnerFromWidget: (native: Record<string, Partial<LeitnerState>>) => number;
 }
 
-const DEFAULT_SETTINGS: Settings = { fontSize: "md", dailyCards: 10, theme: "system" };
+const DEFAULT_SETTINGS: Settings = { fontSize: "md", dailyCards: 10, theme: "system", notifications: true };
 
 // Sanitize any persisted (possibly old or corrupt) state so a bad shape can never crash the app.
 function sanitize(st: Partial<AppState> | undefined): Partial<AppState> {
@@ -187,7 +189,7 @@ function sanitize(st: Partial<AppState> | undefined): Partial<AppState> {
   out.planDoneAt = planDoneAt;
   out.settings =
     st.settings && typeof st.settings === "object"
-      ? { ...DEFAULT_SETTINGS, ...st.settings, fontSize: st.settings.fontSize ?? "md", dailyCards: Number(st.settings.dailyCards) || 10, theme: st.settings.theme === "dark" || st.settings.theme === "light" ? st.settings.theme : "system" }
+      ? { ...DEFAULT_SETTINGS, ...st.settings, fontSize: st.settings.fontSize ?? "md", dailyCards: Number(st.settings.dailyCards) || 10, theme: st.settings.theme === "dark" || st.settings.theme === "light" ? st.settings.theme : "system", notifications: st.settings.notifications !== false }
       : DEFAULT_SETTINGS;
   return out;
 }

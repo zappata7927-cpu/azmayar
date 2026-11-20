@@ -41,6 +41,7 @@ import { GoalDialog } from "@/components/goal-dialog";
 import { formatJalaliLong } from "@/lib/jalali";
 import { faNum, cn } from "@/lib/utils";
 import { tapHaptic } from "@/lib/haptics";
+import { ensureNotifPermission, scheduleDailyReminder, scheduleUnlockNotifs } from "@/lib/notify";
 
 export const GROUP_ICONS: Record<string, LucideIcon> = {
   "بیوشیمی خون": FlaskConical,
@@ -505,6 +506,29 @@ function TodayPlanCard({
   );
 }
 
+/** quiz batches currently locked with a KNOWN unlock moment (v1.6.2 — drives the
+ *  unlock notifications). Mirrors the TodayPlanCard chain: a batch unlocks
+ *  QUIZ_COOLDOWN after the previous batch was completed; batches waiting for a
+ *  not-yet-completed predecessor have no fixed moment and are excluded. */
+function lockedQuizSchedule(plan: TodayPlan, done: string[], doneAt: Record<string, number>): { title: string; unlockAt: number }[] {
+  const out: { title: string; unlockAt: number }[] = [];
+  let prevDone = true;
+  let prevDoneAt: number | null = null;
+  for (const it of plan.items.filter((i) => i.kind === "quiz")) {
+    if (prevDone && prevDoneAt !== null && !done.includes(it.id)) {
+      out.push({ title: it.title, unlockAt: prevDoneAt + QUIZ_COOLDOWN_MS });
+    }
+    if (done.includes(it.id)) {
+      prevDone = true;
+      prevDoneAt = typeof doneAt[it.id] === "number" ? doneAt[it.id] : null;
+    } else {
+      prevDone = false;
+      prevDoneAt = null;
+    }
+  }
+  return out;
+}
+
 export function HomeView({ data, navigate }: {  data: AppData;
   navigate: (r: Route) => void;
 }) {
@@ -534,7 +558,25 @@ export function HomeView({ data, navigate }: {  data: AppData;
     () => buildTodayPlan(data, { leitner, qstats, mistakes, settings, studyGoal }),
     [data, leitner, qstats, mistakes, settings, studyGoal]
   );
-  const doneToday = planDone[planDayKey()] ?? [];
+  const doneToday = useMemo(() => planDone[planDayKey()] ?? [], [planDone]);
+  const doneAtToday = useMemo(() => planDoneAt[planDayKey()] ?? {}, [planDoneAt]);
+
+  // v1.6.2 reminders: rescheduled at every home visit — unlock notifications for
+  // the locked quiz batches of the plan, plus the daily «یادت نره» reminder that
+  // only fires when a whole day passes without opening the app (same-id overwrite)
+  useEffect(() => {
+    if (!settings.notifications) return;
+    let alive = true;
+    void (async () => {
+      const ok = await ensureNotifPermission();
+      if (!ok || !alive) return;
+      await scheduleUnlockNotifs(lockedQuizSchedule(plan, doneToday, doneAtToday));
+      await scheduleDailyReminder();
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [plan, doneToday, doneAtToday, settings.notifications]);
 
   return (
     <div className="space-y-5">
@@ -569,7 +611,7 @@ export function HomeView({ data, navigate }: {  data: AppData;
         goalSet={!!studyGoal.goal}
         examDate={studyGoal.examDate}
         done={doneToday}
-        doneAt={planDoneAt[planDayKey()] ?? {}}
+        doneAt={doneAtToday}
         onToggle={togglePlanItem}
         onNavigate={navigate}
         onPickGoal={() => setGoalOpen(true)}
