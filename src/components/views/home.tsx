@@ -10,6 +10,10 @@ import {
   ChevronLeft,
   Sparkles,
   Lightbulb,
+  CalendarDays,
+  Target,
+  Check,
+  ChevronLeft as GoLeft,
   Shuffle,
   ChevronLeft as ArrowLeftIcon,
   Droplets,
@@ -25,8 +29,10 @@ import {
 import type { AppData } from "@/lib/types";
 import { assetUrl } from "@/lib/types";
 import type { Route } from "@/lib/nav";
-import { useAppStore } from "@/lib/store";
+import { useAppStore, planDayKey } from "@/lib/store";
 import { useActivityMedal, type Activity as ActivityInfo } from "@/lib/achievements";
+import { buildTodayPlan, type PlanItem, type TodayPlan } from "@/lib/study-plan";
+import { GoalDialog } from "@/components/goal-dialog";
 import { faNum, cn } from "@/lib/utils";
 
 export const GROUP_ICONS: Record<string, LucideIcon> = {
@@ -185,11 +191,128 @@ function MedalCard({ activity: a }: { activity: ActivityInfo }) {
   );
 }
 
+/** «برنامه امروز» — a checkable daily plan built from the user's goal, exam
+ *  countdown, content volume and past performance (v1.3). */
+function TodayPlanCard({
+  plan,
+  goalSet,
+  done,
+  onToggle,
+  onNavigate,
+  onPickGoal,
+}: {
+  plan: TodayPlan;
+  goalSet: boolean;
+  done: string[];
+  onToggle: (id: string) => void;
+  onNavigate: (r: Route) => void;
+  onPickGoal: () => void;
+}) {
+  const doneCount = plan.items.filter((i) => done.includes(i.id)).length;
+  const allDone = plan.items.length > 0 && doneCount === plan.items.length;
+  const row = (item: PlanItem) => {
+    const isDone = done.includes(item.id);
+    return (
+      <div
+        key={item.id}
+        className={cn(
+          "flex items-center gap-3 rounded-2xl border p-3 transition-colors",
+          isDone ? "border-emerald-500/30 bg-emerald-500/8" : "border-border/70 bg-card"
+        )}
+      >
+        <button
+          onClick={() => onToggle(item.id)}
+          aria-label={isDone ? "علامت‌زدن به‌عنوان انجام‌نشده" : "علامت‌زدن به‌عنوان انجام‌شده"}
+          className={cn(
+            "grid h-7 w-7 shrink-0 place-items-center rounded-full border-2 transition-colors",
+            isDone ? "border-emerald-500 bg-emerald-500 text-white" : "border-border text-transparent"
+          )}
+        >
+          <Check className="h-4 w-4" />
+        </button>
+        <button onClick={() => onNavigate(item.route)} className="min-w-0 flex-1 text-right">
+          <span className={cn("block text-sm font-bold", isDone && "text-emerald-700 line-through decoration-emerald-500/50 dark:text-emerald-300")}>
+            {item.title}
+          </span>
+          <span className="block truncate text-[11px] text-muted-foreground">{item.detail}</span>
+        </button>
+        <button onClick={() => onNavigate(item.route)} aria-label="شروع" className="shrink-0 rounded-lg p-1 text-muted-foreground/60">
+          <GoLeft className="h-4 w-4" />
+        </button>
+      </div>
+    );
+  };
+
+  if (!goalSet) {
+    return (
+      <section className="rounded-3xl border border-primary/30 bg-primary/5 p-4 shadow-sm">
+        <div className="flex items-center gap-3">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary">
+            <Target className="h-5 w-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-black">هدف مطالعه‌ات را مشخص کن</div>
+            <div className="text-[11px] leading-5 text-muted-foreground">
+              امتحان دانشگاه، ارشد، استخدامی… — بعد آزمـیار هر روز می‌گوید چه چیزی بخوانی
+            </div>
+          </div>
+        </div>
+        <button
+          onClick={onPickGoal}
+          className="mt-3 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-2xl bg-primary font-bold text-white transition-transform active:scale-[0.98]"
+        >
+          <Target className="h-4.5 w-4.5" /> انتخاب هدف مطالعه
+        </button>
+      </section>
+    );
+  }
+
+  return (
+    <section className="rounded-3xl border bg-card p-4 shadow-sm">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2 text-[15px] font-bold">
+          <CalendarDays className="h-4.5 w-4.5 text-primary" /> برنامه امروز
+        </div>
+        {plan.goalTitle && (
+          <span className="rounded-lg bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">{plan.goalTitle}</span>
+        )}
+        {plan.daysLeft !== null && (
+          <span
+            className={cn(
+              "rounded-lg px-2 py-0.5 text-[10px] font-black",
+              plan.daysLeft === 0 ? "bg-rose-500/15 text-rose-600 dark:text-rose-300" : "bg-amber-500/15 text-amber-700 dark:text-amber-300"
+            )}
+          >
+            {plan.daysLeft === 0 ? "آزمون نزدیک است!" : `${faNum(plan.daysLeft)} روز مانده`}
+          </span>
+        )}
+        <span className="mr-auto text-[11px] font-bold text-muted-foreground">
+          {faNum(doneCount)}/{faNum(plan.items.length)}
+        </span>
+      </div>
+      <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-muted">
+        <div
+          className="h-full rounded-full bg-emerald-500 transition-all duration-300"
+          style={{ width: `${plan.items.length ? (doneCount / plan.items.length) * 100 : 0}%` }}
+        />
+      </div>
+      <div className="space-y-2">{plan.items.length ? plan.items.map(row) : <p className="py-3 text-center text-xs text-muted-foreground">برنامه‌ای ساخته نشد — چند مطلب مطالعه کنید تا برنامه فعال شود.</p>}</div>
+      {allDone && (
+        <p className="mt-3 rounded-xl bg-emerald-500/10 p-2.5 text-center text-xs font-bold text-emerald-700 dark:text-emerald-300">
+          برنامه امروز کامل شد ✓ عالی بود!
+        </p>
+      )}
+      <p className="mt-3 text-[11px] leading-6 text-muted-foreground">{plan.note}</p>
+    </section>
+  );
+}
+
 export function HomeView({ data, navigate }: {  data: AppData;
   navigate: (r: Route) => void;
 }) {
-  const { lastTest, favorites, leitner } = useAppStore();
+  const { lastTest, favorites, leitner, qstats, mistakes, settings, studyGoal, planDone, togglePlanItem } = useAppStore();
   const activity = useActivityMedal();
+  const [goalOpen, setGoalOpen] = useState(false);
   const last = useMemo(() => data.tests.find((t) => t.id === lastTest), [data.tests, lastTest]);
   const favTests = useMemo(
     () => favorites.map((id) => data.tests.find((t) => t.id === id)).filter(Boolean) as typeof data.tests,
@@ -208,6 +331,12 @@ export function HomeView({ data, navigate }: {  data: AppData;
     { label: "کارت مرور", value: data.cards.length, href: () => navigate({ v: "leitner" }) },
     { label: "سوال آزمون", value: data.questions.length, href: () => navigate({ v: "quiz" }) },
   ];
+
+  const plan = useMemo(
+    () => buildTodayPlan(data, { leitner, qstats, mistakes, settings, studyGoal }),
+    [data, leitner, qstats, mistakes, settings, studyGoal]
+  );
+  const doneToday = planDone[planDayKey()] ?? [];
 
   return (
     <div className="space-y-5">
@@ -235,6 +364,17 @@ export function HomeView({ data, navigate }: {  data: AppData;
           ))}
         </div>
       </section>
+
+      {/* Today's study plan — goal-driven daily checklist (v1.3) */}
+      <TodayPlanCard
+        plan={plan}
+        goalSet={!!studyGoal.goal}
+        done={doneToday}
+        onToggle={togglePlanItem}
+        onNavigate={navigate}
+        onPickGoal={() => setGoalOpen(true)}
+      />
+      <GoalDialog open={goalOpen} onOpenChange={setGoalOpen} />
 
       {/* Honorary medal — encourages continued useful use of the app */}
       <MedalCard activity={activity} />

@@ -8,7 +8,7 @@ export type Route =
   | { v: "cat"; cat: string }
   | { v: "test"; id: string }
   | { v: "leitner" }
-  | { v: "quiz" }
+  | { v: "quiz"; mode?: "mistakes"; cat?: string; count?: number }
   | { v: "interpret" }
   | { v: "about" };
 
@@ -26,6 +26,8 @@ export function parseHash(hash: string): Route {
     case "leitner":
       return { v: "leitner" };
     case "quiz":
+      if (parts[1] === "mistakes") return { v: "quiz", mode: "mistakes" };
+      if (parts[1] === "c") return { v: "quiz", cat: parts[2] ?? "" };
       return { v: "quiz" };
     case "interpret":
       return { v: "interpret" };
@@ -49,6 +51,8 @@ export function routeToHash(r: Route): string {
     case "leitner":
       return "#/leitner";
     case "quiz":
+      if (r.mode === "mistakes") return "#/quiz/mistakes";
+      if (r.cat) return `#/quiz/c/${encodeURIComponent(r.cat)}`;
       return "#/quiz";
     case "interpret":
       return "#/interpret";

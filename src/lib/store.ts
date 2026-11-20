@@ -19,6 +19,35 @@ export interface QuizRun {
   label: string;
 }
 
+/** per-question spaced-repetition state (like Leitner, but for quiz questions) */
+export interface QuestionStat {
+  box: number; // 1..5 mastery box
+  due: number; // epoch ms — when the question should be re-asked
+  seen: number;
+  ok: number;
+  /** difficulty tier 1..3 — grows gradually as the question is mastered */
+  tier: number;
+  updatedAt: number;
+}
+
+export type StudyGoalKey = "uni" | "hire" | "msc" | "basics" | "pro";
+
+export const GOAL_KEYS: StudyGoalKey[] = ["uni", "hire", "msc", "basics", "pro"];
+
+export interface StudyGoal {
+  goal: StudyGoalKey | null;
+  /** exam date "YYYY-MM-DD" (only for exam-style goals) */
+  examDate: string | null;
+}
+
+export const GOAL_TITLES: Record<StudyGoalKey, string> = {
+  uni: "امتحانات دانشگاه",
+  hire: "آزمون استخدامی",
+  msc: "آزمون کارشناسی ارشد",
+  basics: "مرور دروس پایه",
+  pro: "ارتقای دانش تخصصی",
+};
+
 export interface Settings {
   fontSize: "sm" | "md" | "lg" | "xl";
   dailyCards: number;
@@ -35,6 +64,11 @@ interface AppState {
   leitnerResetAt: number;
   quizHistory: QuizRun[];
   mistakes: Record<string, number>;
+  /** per-question spaced repetition + weakness tracking (adaptive quiz engine) */
+  qstats: Record<string, QuestionStat>;
+  studyGoal: StudyGoal;
+  /** "YYYY-MM-DD" → ids of today-plan items the user checked off */
+  planDone: Record<string, string[]>;
   settings: Settings;
   toggleFav: (id: string) => void;
   markRead: (id: string) => void;
@@ -42,6 +76,11 @@ interface AppState {
   answerCard: (id: string, good: boolean) => void;
   addQuizRun: (run: QuizRun) => void;
   addMistake: (qid: string) => void;
+  removeMistake: (qid: string) => void;
+  /** record one quiz answer into the per-question spaced-repetition state */
+  answerQuestion: (id: string, good: boolean) => void;
+  setStudyGoal: (g: Partial<StudyGoal>) => void;
+  togglePlanItem: (itemId: string) => void;
   clearMistakes: () => void;
   setSettings: (s: Partial<Settings>) => void;
   resetLeitner: () => void;
@@ -89,6 +128,40 @@ function sanitize(st: Partial<AppState> | undefined): Partial<AppState> {
     for (const [k, v] of Object.entries(st.mistakes)) if (typeof v === "number") mistakes[k] = v;
   }
   out.mistakes = mistakes;
+  const qstats: Record<string, QuestionStat> = {};
+  if (st.qstats && typeof st.qstats === "object") {
+    for (const [k, v] of Object.entries(st.qstats)) {
+      const qv = v as QuestionStat;
+      if (qv && typeof qv === "object" && typeof qv.due === "number") {
+        qstats[k] = {
+          box: Math.max(0, Math.min(5, Number(qv.box) || 0)),
+          due: qv.due,
+          seen: Number(qv.seen) || 0,
+          ok: Number(qv.ok) || 0,
+          tier: Math.max(1, Math.min(3, Number(qv.tier) || 1)),
+          updatedAt: typeof qv.updatedAt === "number" ? qv.updatedAt : 0,
+        };
+      }
+    }
+  }
+  out.qstats = qstats;
+  out.studyGoal = {
+    goal:
+      st.studyGoal && typeof st.studyGoal === "object" && GOAL_KEYS.includes(st.studyGoal.goal as StudyGoalKey)
+        ? (st.studyGoal.goal as StudyGoalKey)
+        : null,
+    examDate:
+      st.studyGoal && typeof st.studyGoal === "object" && typeof st.studyGoal.examDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(st.studyGoal.examDate)
+        ? st.studyGoal.examDate
+        : null,
+  };
+  const planDone: Record<string, string[]> = {};
+  if (st.planDone && typeof st.planDone === "object") {
+    for (const [k, v] of Object.entries(st.planDone)) {
+      if (Array.isArray(v)) planDone[k] = v.filter((x) => typeof x === "string").slice(0, 30);
+    }
+  }
+  out.planDone = planDone;
   out.settings =
     st.settings && typeof st.settings === "object"
       ? { ...DEFAULT_SETTINGS, ...st.settings, fontSize: st.settings.fontSize ?? "md", dailyCards: Number(st.settings.dailyCards) || 10, theme: st.settings.theme === "dark" || st.settings.theme === "light" ? st.settings.theme : "system" }
@@ -106,6 +179,9 @@ export const useAppStore = create<AppState>()(
       leitnerResetAt: 0,
       quizHistory: [],
       mistakes: {},
+      qstats: {},
+      studyGoal: { goal: null, examDate: null },
+      planDone: {},
       settings: DEFAULT_SETTINGS,
       toggleFav: (id) =>
         set((st) => ({
@@ -136,11 +212,46 @@ export const useAppStore = create<AppState>()(
       addQuizRun: (run) => set((st) => ({ quizHistory: [run, ...st.quizHistory].slice(0, 40) })),
       addMistake: (qid) =>
         set((st) => ({ mistakes: { ...st.mistakes, [qid]: (st.mistakes[qid] ?? 0) + 1 } })),
+      removeMistake: (qid) =>
+        set((st) => {
+          if (!(qid in st.mistakes)) return st;
+          const mistakes = { ...st.mistakes };
+          delete mistakes[qid];
+          return { mistakes };
+        }),
+      answerQuestion: (id, good) =>
+        set((st) => {
+          const cur = st.qstats[id] ?? { box: 0, due: 0, seen: 0, ok: 0, tier: 1, updatedAt: 0 };
+          const now = Date.now();
+          // mastery box climbs on correct answers; a miss drops the question back to
+          // box 1 and re-asks it in 10 minutes. The difficulty tier rises gradually
+          // (1→2 at box 3, 2→3 at box 5) so hard material appears over time.
+          const box = good ? Math.min(5, cur.box + 1) : 1;
+          let tier = cur.tier;
+          if (good && box >= 3 && tier < 2) tier = 2;
+          if (good && box >= 5 && tier < 3) tier = 3;
+          const days = Q_INTERVALS[Math.min(5, box) - 1] ?? 1;
+          const due = good ? now + days * 86400000 : now + 10 * 60 * 1000;
+          return {
+            qstats: {
+              ...st.qstats,
+              [id]: { box, due, seen: cur.seen + 1, ok: cur.ok + (good ? 1 : 0), tier, updatedAt: now },
+            },
+          };
+        }),
+      setStudyGoal: (g) => set((st) => ({ studyGoal: { ...st.studyGoal, ...g } })),
+      togglePlanItem: (itemId) =>
+        set((st) => {
+          const key = planDayKey();
+          const cur = st.planDone[key] ?? [];
+          const next = cur.includes(itemId) ? cur.filter((x) => x !== itemId) : [...cur, itemId];
+          return { planDone: { ...st.planDone, [key]: next } };
+        }),
       clearMistakes: () => set({ mistakes: {} }),
       setSettings: (s) => set((st) => ({ settings: { ...st.settings, ...s } })),
       resetLeitner: () => set({ leitner: {}, leitnerResetAt: Date.now() }),
       resetAll: () =>
-        set({ favorites: [], read: [], lastTest: null, leitner: {}, leitnerResetAt: Date.now(), quizHistory: [], mistakes: {} }),
+        set({ favorites: [], read: [], lastTest: null, leitner: {}, leitnerResetAt: Date.now(), quizHistory: [], mistakes: {}, qstats: {}, planDone: {} }),
       mergeLeitnerFromWidget: (native) => {
         if (!native || typeof native !== "object") return 0;
         const st = get();
@@ -172,7 +283,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: "azmayar-store-v1",
-      version: 2,
+      version: 3,
       migrate: (persisted) => sanitize(persisted as Partial<AppState>),
       merge: (persisted, current) => ({ ...current, ...sanitize(persisted as Partial<AppState>) }),
     }
@@ -181,6 +292,15 @@ export const useAppStore = create<AppState>()(
 
 // Leitner intervals (days) for boxes 1..5
 export const BOX_INTERVALS = [1, 3, 7, 14, 30];
+
+// Question spaced-repetition intervals (days) for boxes 1..5 — a question the
+// user keeps getting right is re-asked after an ever longer gap
+export const Q_INTERVALS = [1, 2, 4, 7, 14];
+
+/** local "YYYY-MM-DD" key for the today-plan checklist */
+export function planDayKey(d = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 export function cardDue(box: number, good: boolean): number {
   const now = Date.now();

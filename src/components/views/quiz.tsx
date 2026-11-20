@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ClipboardCheck, Play, Check, X, ChevronLeft, Trophy, BookOpenCheck, RotateCcw, History, BadgeCheck, Flame, GraduationCap, TrendingUp, Award, ChevronDown, ChevronUp, ArrowUpRight, ArrowDownRight, Minus } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ClipboardCheck, Play, Check, X, ChevronLeft, Trophy, BookOpenCheck, RotateCcw, History, BadgeCheck, Flame, GraduationCap, TrendingUp, Award, ChevronDown, ChevronUp, ArrowUpRight, ArrowDownRight, Minus, Sparkles, Target } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import type { AppData, Question } from "@/lib/types";
 import type { Route } from "@/lib/nav";
@@ -351,14 +351,33 @@ function QuizHistoryCard({ runs }: { runs: QuizRun[] }) {
   );
 }
 
-export function QuizView({ data, navigate }: { data: AppData; navigate: (r: Route) => void }) {
-  const { quizHistory, addQuizRun, mistakes, addMistake, read, clearMistakes } = useAppStore();
-  const [phase, setPhase] = useState<Phase>("setup");
-  const [session, setSession] = useState<QuizSession | null>(null);
+export function QuizView({ data, navigate, route }: { data: AppData; navigate: (r: Route) => void; route: Route }) {
+  const { quizHistory, addQuizRun, mistakes, addMistake, removeMistake, answerQuestion, read } = useAppStore();
+  // deep-link entry (from the today-plan card): build the session synchronously on
+  // first render so a plan item like «۱۰ سؤال بانک خون» opens the quiz immediately
+  const [bootstrap] = useState(() => {
+    if (route.v !== "quiz") return null;
+    let mode: QuizMode | null = null;
+    let n = 10;
+    if (route.mode === "mistakes") mode = { kind: "mistakes" };
+    else if (route.cat) {
+      mode = { kind: "adaptive", cat: route.cat };
+      if (route.count) n = route.count;
+    }
+    if (!mode) return null;
+    try {
+      const s = buildQuiz(data, mode, n, false);
+      return s.questions.length ? s : null;
+    } catch {
+      return null;
+    }
+  });
+  const [phase, setPhase] = useState<Phase>(bootstrap ? "run" : "setup");
+  const [session, setSession] = useState<QuizSession | null>(bootstrap);
   const [pos, setPos] = useState(0);
   const [picked, setPicked] = useState<number | null>(null);
   const [score, setScore] = useState(0);
-  const [wrongList, setWrongList] = useState<Question[]>([]);
+  const [results, setResults] = useState<{ q: Question; ok: boolean }[]>([]);
   const [count, setCount] = useState(10);
   const [onlyRead, setOnlyRead] = useState(false);
 
@@ -398,7 +417,7 @@ export function QuizView({ data, navigate }: { data: AppData; navigate: (r: Rout
     setPos(0);
     setPicked(null);
     setScore(0);
-    setWrongList([]);
+    setResults([]);
   };
 
   const pick = (idx: number, q: Question) => {
@@ -406,11 +425,16 @@ export function QuizView({ data, navigate }: { data: AppData; navigate: (r: Rout
     void tapHaptic();
     setPicked(idx);
     const ok = idx === (Number.isInteger(q.answer) && Array.isArray(q.options) && q.answer >= 0 && q.answer < q.options.length ? q.answer : 0);
-    if (ok) setScore((s) => s + 1);
-    else {
+    // adaptive engine: every answer feeds the per-question spaced-repetition state;
+    // a correct answer also clears the question from the "mistakes" review list
+    answerQuestion(q.id, ok);
+    if (ok) {
+      setScore((s) => s + 1);
+      removeMistake(q.id);
+    } else {
       addMistake(q.id);
-      setWrongList((w) => [...w, q]);
     }
+    setResults((w) => [...w, { q, ok }]);
   };
 
   const next = () => {
@@ -419,7 +443,6 @@ export function QuizView({ data, navigate }: { data: AppData; navigate: (r: Rout
       const finalScore = score;
       addQuizRun({ at: Date.now(), score: finalScore, total: session.questions.length, label: session.label });
       setPhase("result");
-      if (!wrongList.length) clearMistakes();
       return;
     }
     setPos(pos + 1);
@@ -535,6 +558,20 @@ export function QuizView({ data, navigate }: { data: AppData; navigate: (r: Rout
   if (phase === "result" && session) {
     const total = Math.max(session.questions.length, 1);
     const pct = Math.max(0, Math.min(100, Math.round((score / total) * 100)));
+    const wrongQs = results.filter((r) => !r.ok).map((r) => r.q);
+    // strengths & weaknesses per category for this session
+    const byCat = new Map<string, { n: number; ok: number }>();
+    for (const r of results) {
+      const g = byCat.get(r.q.cat) ?? { n: 0, ok: 0 };
+      g.n += 1;
+      if (r.ok) g.ok += 1;
+      byCat.set(r.q.cat, g);
+    }
+    const catList = [...byCat.entries()]
+      .map(([cat, g]) => ({ cat, n: g.n, pct: Math.round((g.ok / g.n) * 100) }))
+      .sort((a, b) => b.pct - a.pct);
+    const strongCats = catList.filter((c) => c.pct >= 70);
+    const weakCats = catList.filter((c) => c.pct < 70);
     const msg = pct >= 90 ? { t: "عالی بود!", d: "تسلط شما بر این مبحث چشمگیر است.", i: Trophy, c: "text-amber-500" }
       : pct >= 70 ? { t: "خیلی خوب", d: "با کمی مرور بیشتر، کاملاً مسلط می‌شوید.", i: BadgeCheck, c: "text-emerald-500" }
       : pct >= 50 ? { t: "قابل قبول", d: "سری به جعبه لایتنر بزنید و دوباره امتحان کنید.", i: Flame, c: "text-orange-500" }
@@ -571,13 +608,60 @@ export function QuizView({ data, navigate }: { data: AppData; navigate: (r: Rout
           </div>
         </div>
 
-        {wrongList.length > 0 && (
+        {/* strengths & weaknesses (adaptive engine report) */}
+        {catList.length > 0 && (
+          <section className="rounded-2xl border bg-card p-4 shadow-sm">
+            <h2 className="mb-1 flex items-center gap-2 text-[15px] font-bold">
+              <Target className="h-4.5 w-4.5 text-primary" /> نقاط قوت و ضعف این آزمون
+            </h2>
+            <p className="mb-3 text-[11px] text-muted-foreground">روی هر مبحث بزنید تا آزمون هوشمند همان مبحث شروع شود</p>
+            {strongCats.length > 0 && (
+              <div className="mb-3">
+                <p className="mb-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">نقاط قوت</p>
+                <div className="flex flex-wrap gap-2">
+                  {strongCats.map((c) => (
+                    <button
+                      key={c.cat}
+                      onClick={() => startQuiz({ kind: "adaptive", cat: c.cat })}
+                      className="rounded-xl bg-emerald-500/12 px-3 py-1.5 text-xs font-bold text-emerald-700 transition-transform active:scale-95 dark:text-emerald-300"
+                    >
+                      {c.cat} · {faNum(c.pct)}٪
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {weakCats.length > 0 && (
+              <div>
+                <p className="mb-1.5 text-xs font-bold text-rose-600 dark:text-rose-400">نیاز به تمرین بیشتر</p>
+                <div className="flex flex-wrap gap-2">
+                  {weakCats.map((c) => (
+                    <button
+                      key={c.cat}
+                      onClick={() => startQuiz({ kind: "adaptive", cat: c.cat })}
+                      className="rounded-xl bg-rose-500/12 px-3 py-1.5 text-xs font-bold text-rose-700 transition-transform active:scale-95 dark:text-rose-300"
+                    >
+                      {c.cat} · {faNum(c.pct)}٪
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <p className="mt-3 rounded-xl bg-muted/50 p-2.5 text-[11px] leading-6 text-muted-foreground">
+              {results.filter((r) => !r.ok).length > 0
+                ? "سؤال‌های نادرست با مرور فاصله‌دار علامت خوردند و در آزمون‌های بعدی زودتر دوباره پرسیده می‌شوند."
+                : "سؤال‌های درست در مرور‌های بعدی با فاصله بیشتری تکرار می‌شوند تا در ذهن بمانند."}
+            </p>
+          </section>
+        )}
+
+        {wrongQs.length > 0 && (
           <section className="rounded-2xl border bg-card p-4 shadow-sm">
             <h2 className="mb-3 flex items-center gap-2 text-[15px] font-bold text-rose-600 dark:text-rose-400">
               <X className="h-4.5 w-4.5" /> مرور پاسخ‌های نادرست
             </h2>
             <div className="space-y-3">
-              {wrongList.map((q) => (
+              {wrongQs.map((q) => (
                 <div key={q.id} className="rounded-2xl border border-rose-500/25 bg-rose-500/5 p-3.5">
                   <p className="text-sm font-bold leading-7">{q.q}</p>
                   <p className="mt-1.5 text-sm leading-7 text-emerald-700 dark:text-emerald-400">
@@ -614,6 +698,23 @@ export function QuizView({ data, navigate }: { data: AppData; navigate: (r: Rout
           </div>
         </div>
       </div>
+
+      {/* adaptive smart quiz — the primary way to take a quiz */}
+      <button
+        onClick={() => startQuiz({ kind: "adaptive" })}
+        className="relative flex w-full items-center gap-3 overflow-hidden rounded-3xl bg-gradient-to-bl from-primary via-primary to-primary/75 p-4 text-right text-white shadow-md transition-transform active:scale-[0.99]"
+      >
+        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/15">
+          <Sparkles className="h-6 w-6" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[15px] font-black">شروع آزمون هوشمند</span>
+          <span className="block text-[11px] leading-5 text-white/85">
+            بر اساس نقاط ضعف شما • مرور فاصله‌دار سؤال‌ها • افزایش تدریجی دشواری
+          </span>
+        </span>
+        <ChevronLeft className="h-5 w-5 shrink-0" />
+      </button>
 
       {/* count */}
       <section className="rounded-2xl border bg-card p-4 shadow-sm">

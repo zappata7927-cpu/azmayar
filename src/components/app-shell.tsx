@@ -11,6 +11,8 @@ import {
   Search,
   Settings,
   ChevronRight,
+  ChevronLeft,
+  Target,
   Star,
   RotateCcw,
   X,
@@ -57,6 +59,8 @@ import { ViewErrorBoundary } from "@/components/error-boundary";
 import { initWidgetSync, pullWidgetState, isNativeApp } from "@/lib/widget-bridge";
 import { initReminder } from "@/lib/reminder";
 import { tapHaptic } from "@/lib/haptics";
+import { GoalDialog } from "@/components/goal-dialog";
+import { GOALS } from "@/lib/study-plan";
 import { App } from "@capacitor/app";
 import { cn, faNum } from "@/lib/utils";
 
@@ -200,10 +204,12 @@ function SearchDialog({ open, onOpenChange, data, navigate }: {
 // ---------------- Settings sheet ----------------
 function SettingsSheet({ data }: { data: AppData }) {
   const { theme, setTheme } = useTheme();
-  const { settings, setSettings, resetLeitner, resetAll, favorites, read } = useAppStore();
+  const { settings, setSettings, resetLeitner, resetAll, favorites, read, studyGoal } = useAppStore();
   const [mounted, setMounted] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const [wipeOpen, setWipeOpen] = useState(false);
+  const [goalOpen, setGoalOpen] = useState(false);
+  const currentGoal = studyGoal.goal ? GOALS.find((g) => g.key === studyGoal.goal) : null;
   useEffect(() => {
     const id = window.setTimeout(() => setMounted(true), 0);
     return () => window.clearTimeout(id);
@@ -222,6 +228,29 @@ function SettingsSheet({ data }: { data: AppData }) {
           </SheetTitle>
         </SheetHeader>
         <div className="mt-6 space-y-6">
+          <div>
+            <p className="mb-2.5 text-sm font-bold">هدف مطالعه</p>
+            <button
+              onClick={() => setGoalOpen(true)}
+              className="flex w-full items-center gap-3 rounded-xl border p-3 text-right transition-colors hover:border-primary/40"
+            >
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+                {currentGoal ? <currentGoal.icon className="h-4.5 w-4.5" /> : <Target className="h-4.5 w-4.5" />}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold">{currentGoal ? currentGoal.title : "انتخاب نشده"}</span>
+                <span className="block text-[11px] text-muted-foreground">
+                  {currentGoal && studyGoal.examDate
+                    ? `تاریخ آزمون: ${new Date(studyGoal.examDate).toLocaleDateString("fa-IR")}`
+                    : currentGoal
+                      ? currentGoal.desc
+                      : "برای برنامه مطالعه روزانه انتخاب کنید"}
+                </span>
+              </span>
+              <ChevronLeft className="h-4 w-4 shrink-0 text-muted-foreground/50" />
+            </button>
+            <GoalDialog open={goalOpen} onOpenChange={setGoalOpen} />
+          </div>
           <div>
             <p className="mb-2.5 text-sm font-bold">حالت نمایش</p>
             <div className="grid grid-cols-3 gap-2">
@@ -461,7 +490,7 @@ export function AppShell() {
           {route.v === "cat" && <CategoryView data={data} cat={route.cat} navigate={navigate} />}
           {route.v === "test" && <TestView data={data} id={route.id} navigate={navigate} />}
           {route.v === "leitner" && <LeitnerView data={data} navigate={navigate} />}
-          {route.v === "quiz" && <QuizView data={data} navigate={navigate} />}
+          {route.v === "quiz" && <QuizView data={data} navigate={navigate} route={route} />}
           {route.v === "interpret" && <InterpretView data={data} />}
           {route.v === "about" && <AboutView data={data} />}
         </ViewErrorBoundary>

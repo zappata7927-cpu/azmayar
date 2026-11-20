@@ -2,8 +2,10 @@
 
 import type { AppData, Question } from "./types";
 import { useAppStore } from "./store";
+import { categoryPerformance, pickAdaptiveQuestions } from "./adaptive";
 
 export type QuizMode =
+  | { kind: "adaptive"; cat?: string }
   | { kind: "cat"; cat: string }
   | { kind: "group"; group: string }
   | { kind: "all" }
@@ -46,7 +48,10 @@ export function buildQuiz(
     (q) => q && typeof q.q === "string" && q.q.trim() && Array.isArray(q.options) && q.options.length >= 2
   );  let pool: Question[] = [];
   let label = "";
-  if (mode.kind === "cat") {
+  if (mode.kind === "adaptive") {
+    pool = valid.filter((q) => (mode.cat ? q.cat === mode.cat : true));
+    label = mode.cat ? `آزمون هوشمند — ${mode.cat}` : "آزمون هوشمند";
+  } else if (mode.kind === "cat") {
     pool = valid.filter((q) => q.cat === mode.cat);
     label = mode.cat;
   } else if (mode.kind === "group") {
@@ -62,13 +67,22 @@ export function buildQuiz(
     pool = valid;
     label = "آزمون جامع";
   }
-  if (onlyRead) {
+  if (onlyRead && mode.kind !== "adaptive") {
     const { read } = useAppStore.getState();
     const readSet = new Set(Array.isArray(read) ? read : []);
     const filtered = pool.filter((q) => readSet.has(q.tid));
     if (filtered.length >= Math.min(count, 4)) pool = filtered;
   }
   const seed = Date.now() % 100000000;
+  // adaptive mode: weakness-weighted, spaced-repetition-aware selection with a
+  // difficulty ramp — see lib/adaptive.ts
+  if (mode.kind === "adaptive") {
+    const { qstats, mistakes, leitner } = useAppStore.getState();
+    const perf = categoryPerformance(data, leitner, qstats);
+    const picked = pickAdaptiveQuestions({ pool, count, qstats, mistakes, perf, seed });
+    const rng = mulberry(seed ^ 0x9e3779b9);
+    return { questions: picked.map((q) => shuffleQuestionOptions(q, rng)), label };
+  }
   const shuffled = shuffle(pool, seed);
   // Randomly permute the options of every picked question so the correct answer is not
   // always in the same letter (the bank had ~73% of correct answers in option «الف»).
