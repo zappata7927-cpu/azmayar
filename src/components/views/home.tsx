@@ -26,7 +26,8 @@ import {
 import type { AppData } from "@/lib/types";
 import type { Route } from "@/lib/nav";
 import { useAppStore } from "@/lib/store";
-import { faNum } from "@/lib/utils";
+import { useActivityMedal, type Activity as ActivityInfo } from "@/lib/achievements";
+import { faNum, cn } from "@/lib/utils";
 
 export const GROUP_ICONS: Record<string, LucideIcon> = {
   "بیوشیمی خون": FlaskConical,
@@ -108,11 +109,87 @@ function ClinicalPearl({ data, navigate }: { data: AppData; navigate: (r: Route)
   );
 }
 
-export function HomeView({ data, navigate }: {
-  data: AppData;
+/** Honorary medal earned from real activity: studying, Leitner reviews and quizzes. */
+function MedalCard({ activity: a }: { activity: ActivityInfo }) {
+  const t = a.tier;
+  return (
+    <section className={cn("relative overflow-hidden rounded-3xl border p-5 shadow-sm", t.bg, t.border)}>
+      <div className="absolute -right-10 -top-12 h-32 w-32 rounded-full bg-white/25 blur-2xl" />
+      <div className="absolute -left-8 bottom-0 h-24 w-24 rounded-full bg-white/15 blur-2xl" />
+      <div className="relative">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-[13px] font-bold">
+            <Sparkles className={cn("h-4 w-4", t.text)} />
+            مدال افتخار آزمـیار
+          </div>
+          <span className={cn("rounded-lg bg-white/50 px-2 py-0.5 text-[11px] font-black dark:bg-white/10", t.text)}>
+            سطح {faNum(a.tierIndex + 1)} از {faNum(6)}
+          </span>
+        </div>
+
+        <div className="mt-3.5 flex items-center gap-4">
+          <div className={cn("grid h-[76px] w-[76px] shrink-0 place-items-center rounded-full bg-gradient-to-br p-[3px] shadow-md", t.grad)}>
+            <div className="grid h-full w-full place-items-center rounded-full bg-card text-[2.1rem] leading-none">
+              {t.emoji}
+            </div>
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-[1.15rem] font-black leading-7">{t.name}</div>
+            <div className="mt-0.5 text-xs font-semibold text-muted-foreground">
+              {faNum(a.points)} امتیاز فعالیت
+            </div>
+            <div className="mt-1 text-[11px] text-muted-foreground/85">
+              مطالعه {faNum(a.studyPts)} • مرور {faNum(a.cardPts)} • آزمون {faNum(a.quizPts)}
+            </div>
+          </div>
+        </div>
+
+        {a.next && (
+          <div className="mt-3.5">
+            <div className="mb-1.5 flex items-center justify-between text-[11px] font-bold text-muted-foreground">
+              <span>
+                تا «{a.next.name}» {faNum(a.nextGap)} امتیاز مانده
+              </span>
+              <span className={t.text}>{faNum(Math.round(a.progress * 100))}٪</span>
+            </div>
+            <div className="h-2.5 overflow-hidden rounded-full bg-background/60 shadow-inner">
+              <div
+                className={cn("h-full rounded-full bg-gradient-to-l transition-all duration-500", t.grad)}
+                style={{ width: `${Math.max(4, Math.round(a.progress * 100))}%` }}
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="mt-3.5 grid grid-cols-3 gap-2">
+          <div className="rounded-xl bg-white/45 p-2.5 text-center dark:bg-white/8">
+            <BookOpen className="mx-auto h-3.5 w-3.5 text-primary" />
+            <div className="mt-1 text-sm font-black">{faNum(a.readCount)}</div>
+            <div className="text-[10px] text-muted-foreground">مطلب مطالعه‌شده</div>
+          </div>
+          <div className="rounded-xl bg-white/45 p-2.5 text-center dark:bg-white/8">
+            <Layers className="mx-auto h-3.5 w-3.5 text-primary" />
+            <div className="mt-1 text-sm font-black">{faNum(a.cardsSeen)}</div>
+            <div className="text-[10px] text-muted-foreground">مرور کارت (+{faNum(a.mastered)} مسلط)</div>
+          </div>
+          <div className="rounded-xl bg-white/45 p-2.5 text-center dark:bg-white/8">
+            <ClipboardCheck className="mx-auto h-3.5 w-3.5 text-primary" />
+            <div className="mt-1 text-sm font-black">{faNum(a.quizRuns)}</div>
+            <div className="text-[10px] text-muted-foreground">آزمون (میانگین {faNum(a.quizAvg)}٪)</div>
+          </div>
+        </div>
+
+        <p className="mt-3 text-[12px] leading-6 text-muted-foreground">{t.caption}</p>
+      </div>
+    </section>
+  );
+}
+
+export function HomeView({ data, navigate }: {  data: AppData;
   navigate: (r: Route) => void;
 }) {
   const { lastTest, favorites, leitner } = useAppStore();
+  const activity = useActivityMedal();
   const last = useMemo(() => data.tests.find((t) => t.id === lastTest), [data.tests, lastTest]);
   const favTests = useMemo(
     () => favorites.map((id) => data.tests.find((t) => t.id === id)).filter(Boolean) as typeof data.tests,
@@ -167,6 +244,9 @@ export function HomeView({ data, navigate }: {
           </div>
         </div>
       </section>
+
+      {/* Honorary medal — encourages continued useful use of the app */}
+      <MedalCard activity={activity} />
 
       {/* Quick actions */}
       <section className="grid grid-cols-2 gap-3">

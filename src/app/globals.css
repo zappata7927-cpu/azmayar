@@ -209,3 +209,35 @@
     radial-gradient(130% 160% at 5% 105%, oklch(0.62 0.13 215 / 0.55), transparent 58%),
     linear-gradient(140deg, oklch(0.38 0.075 205), oklch(0.47 0.105 190) 52%, oklch(0.44 0.105 255));
 }
+
+/* score-trend chart animations (path uses pathLength=1 so dash units are normalized) */
+@keyframes chart-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.chart-line {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: chart-draw 1s ease-out 0.15s forwards;
+}
+@keyframes chart-dot-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.chart-dot {
+  opacity: 0;
+  animation: chart-dot-in 0.4s ease-out forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .chart-line,
+  .chart-dot {
+    animation: none;
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}

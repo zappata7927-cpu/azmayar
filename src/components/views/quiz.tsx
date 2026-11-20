@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { ClipboardCheck, Play, Check, X, ChevronLeft, Trophy, BookOpenCheck, RotateCcw, History, BadgeCheck, Flame, GraduationCap, TrendingUp, Award, ChevronDown, ChevronUp } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ClipboardCheck, Play, Check, X, ChevronLeft, Trophy, BookOpenCheck, RotateCcw, History, BadgeCheck, Flame, GraduationCap, TrendingUp, Award, ChevronDown, ChevronUp, ArrowUpRight, ArrowDownRight, Minus } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import type { AppData, Question } from "@/lib/types";
 import type { Route } from "@/lib/nav";
@@ -21,7 +21,7 @@ function pctOf(r: QuizRun): number {
 }
 
 const pctBar = (pct: number) => (pct >= 70 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-500" : "bg-rose-500");
-const pctFill = (pct: number) => (pct >= 70 ? "fill-emerald-500" : pct >= 50 ? "fill-amber-500" : "fill-rose-500");
+const pctHex = (pct: number) => (pct >= 70 ? "#10b981" : pct >= 50 ? "#f59e0b" : "#f43f5e");
 const pctChip = (pct: number) =>
   pct >= 70
     ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
@@ -29,36 +29,213 @@ const pctChip = (pct: number) =>
       ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
       : "bg-rose-500/15 text-rose-600 dark:text-rose-400";
 
-/** Tiny area chart of recent quiz scores (oldest → newest, left → right). */
-function QuizSparkline({ runs }: { runs: { pct: number }[] }) {
-  const w = 100;
-  const h = 34;
+const faDate = (ts: number) => new Date(ts).toLocaleDateString("fa-IR");
+
+/** trend of the recent half vs the earlier half, in percent points (null = too few runs) */
+function trendDelta(pcts: number[]): number | null {
+  if (pcts.length < 2) return null;
+  const mean = (arr: number[]) => arr.reduce((a, b) => a + b, 0) / arr.length;
+  const k = Math.min(2, pcts.length);
+  return Math.round(mean(pcts.slice(-k)) - mean(pcts.slice(0, k)));
+}
+
+/** Catmull-Rom → cubic bezier: a soft curve through the score points */
+function smoothPath(pts: { x: number; y: number }[]): string {
+  if (pts.length < 2) return "";
+  let d = `M${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[Math.min(pts.length - 1, i + 2)];
+    const c1x = p1.x + (p2.x - p0.x) / 6;
+    const c1y = p1.y + (p2.y - p0.y) / 6;
+    const c2x = p2.x - (p3.x - p1.x) / 6;
+    const c2y = p2.y - (p3.y - p1.y) / 6;
+    d += ` C${c1x.toFixed(1)} ${c1y.toFixed(1)} ${c2x.toFixed(1)} ${c2y.toFixed(1)} ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+  }
+  return d;
+}
+
+/**
+ * Advanced interactive score-trend chart (oldest → newest, right = newest).
+ * Rendered in measured pixel coordinates (ResizeObserver) instead of a stretched
+ * viewBox, so the dots are always perfect circles — the old sparkline stretched
+ * its SVG non-uniformly and turned them into ellipses.
+ */
+function ScoreChart({ runs }: { runs: QuizRun[] }) {
+  // callback-ref pattern: the element reports itself, then a ResizeObserver (which
+  // fires once on observe) supplies the width — no setState directly in an effect
+  const [el, setEl] = useState<HTMLDivElement | null>(null);
+  const [w, setW] = useState(0);
+  // selection is stored as the run object itself (not an index): when `runs`
+  // changes the selection self-invalidates without any effect or ref
+  const [selRun, setSelRun] = useState<QuizRun | null>(null);
+  useEffect(() => {
+    if (!el) return;
+    if (typeof ResizeObserver === "undefined") {
+      const id = requestAnimationFrame(() => setW(Math.max(260, el.clientWidth)));
+      const on = () => setW(Math.max(260, el.clientWidth));
+      window.addEventListener("resize", on);
+      return () => {
+        cancelAnimationFrame(id);
+        window.removeEventListener("resize", on);
+      };
+    }
+    const ro = new ResizeObserver((entries) => setW(Math.max(260, Math.round(entries[0].contentRect.width))));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [el]);
+
+  const H = 205;
+  const padT = 24;
+  const padB = 28;
+  const padX = 26;
   const n = runs.length;
-  if (n < 2) return null;
-  const pts = runs.map((r, i) => [2 + (i / (n - 1)) * (w - 4), h - 4 - (r.pct / 100) * (h - 8)] as const);
-  const line = pts.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)} ${y.toFixed(1)}`).join(" ");
-  const area = `${line} L${pts[n - 1][0].toFixed(1)} ${h} L${pts[0][0].toFixed(1)} ${h} Z`;
+  if (n === 0 || w === 0) return <div ref={setEl} style={{ height: H }} />;
+
+  const innerW = w - padX * 2;
+  const innerH = H - padT - padB;
+  const pts = runs.map((r, i) => {
+    const pct = pctOf(r);
+    const x = n === 1 ? padX + innerW / 2 : padX + (i / (n - 1)) * innerW;
+    const y = padT + (1 - pct / 100) * innerH;
+    return { x, y, pct };
+  });
+  const pcts = pts.map((p) => p.pct);
+  const avg = Math.round(pcts.reduce((a, b) => a + b, 0) / n);
+  const avgY = padT + (1 - avg / 100) * innerH;
+  const bestIdx = pcts.indexOf(Math.max(...pcts));
+  const curve = smoothPath(pts);
+  const area = `${curve} L${pts[n - 1].x.toFixed(1)} ${(H - padB).toFixed(1)} L${pts[0].x.toFixed(1)} ${(H - padB).toFixed(1)} Z`;
+  const selIdx = selRun ? runs.indexOf(selRun) : -1;
+  const selP = selIdx >= 0 ? pts[selIdx] : null;
+  const selR = selIdx >= 0 ? runs[selIdx] : null;
+  const selPct = selIdx >= 0 ? pts[selIdx].pct : 0;
+  // tooltip bubble, clamped inside the chart; flips below the dot when near the top
+  const tw = 158;
+  const th = 66;
+  const tipX = selP ? Math.max(4, Math.min(w - tw - 4, selP.x - tw / 2)) : 0;
+  const tipY = selP ? (selP.y - th - 14 < 2 ? selP.y + 16 : selP.y - th - 14) : 0;
+
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="h-16 w-full" role="img" aria-label="روند نمرات آزمون">
-      <defs>
-        <linearGradient id="qh-fill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.32" />
-          <stop offset="100%" stopColor="var(--primary)" stopOpacity="0.02" />
-        </linearGradient>
-      </defs>
-      <path d={area} fill="url(#qh-fill)" />
-      <path d={line} fill="none" stroke="var(--primary)" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-      {pts.map(([x, y], i) => (
-        <circle key={i} cx={x} cy={y} r={i === n - 1 ? 2.4 : 1.5} className={i === n - 1 ? "fill-primary" : pctFill(runs[i].pct)} />
-      ))}
-    </svg>
+    <div ref={setEl} className="relative">
+      <svg width={w} height={H} viewBox={`0 0 ${w} ${H}`} className="block" role="img" aria-label="نمودار روند نمرات آزمون">
+        <defs>
+          <linearGradient id="sc-fill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.30" />
+            <stop offset="100%" stopColor="var(--primary)" stopOpacity="0.02" />
+          </linearGradient>
+        </defs>
+
+        {/* grid + y labels */}
+        {[0, 25, 50, 75, 100].map((v) => {
+          const y = padT + (1 - v / 100) * innerH;
+          return (
+            <g key={v}>
+              <line x1={padX - 8} y1={y} x2={w - padX + 8} y2={y} stroke="#888" strokeOpacity={v === 0 ? 0.3 : 0.15} strokeWidth={1} />
+              <text x={padX - 12} y={y + 3} textAnchor="end" fontSize={9} fill="#999" style={{ direction: "rtl" }}>
+                {faNum(v)}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* average reference line */}
+        <line x1={padX} y1={avgY} x2={w - padX} y2={avgY} stroke="#8b8b95" strokeOpacity={0.5} strokeWidth={1.2} strokeDasharray="5 5" />
+        <text x={w - padX} y={avgY - 5} textAnchor="end" fontSize={9.5} fill="#8b8b95" style={{ direction: "rtl" }}>
+          میانگین {faNum(avg)}٪
+        </text>
+
+        {/* gradient area + smooth animated curve */}
+        <path d={area} fill="url(#sc-fill)" className="chart-dot" style={{ animationDelay: "0.35s" }} />
+        <path
+          d={curve}
+          fill="none"
+          stroke="var(--primary)"
+          strokeWidth={2.6}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          pathLength={1}
+          className="chart-line"
+        />
+
+        {/* selection guide */}
+        {selP && <line x1={selP.x} y1={padT} x2={selP.x} y2={H - padB} stroke="var(--primary)" strokeOpacity={0.3} strokeWidth={1.2} strokeDasharray="3 3" />}
+
+        {/* dots — perfect circles */}
+        {pts.map((p, i) => (
+          <g key={i}>
+            {i === n - 1 && n > 1 && (
+              <>
+                <circle cx={p.x} cy={p.y} r={10} fill="none" stroke="var(--primary)" strokeOpacity={0.35} strokeWidth={1.5} className="chart-dot" style={{ animationDelay: "0.7s" }} />
+                <circle cx={p.x} cy={p.y} r={15} fill="none" stroke="var(--primary)" strokeOpacity={0.14} strokeWidth={1.5} className="chart-dot" style={{ animationDelay: "0.8s" }} />
+              </>
+            )}
+            <circle
+              cx={p.x}
+              cy={p.y}
+              r={selIdx === i ? 6.5 : i === n - 1 ? 6 : 5}
+              fill={pctHex(p.pct)}
+              stroke="var(--card)"
+              strokeWidth={2}
+              className="chart-dot"
+              style={{ animationDelay: `${0.15 + i * 0.045}s` }}
+            />
+            {i === bestIdx && n > 1 && (
+              <text x={p.x} y={p.y - 12} textAnchor="middle" fontSize={12} fill="#f59e0b">
+                ★
+              </text>
+            )}
+          </g>
+        ))}
+
+        {/* x-axis end dates */}
+        <text x={padX} y={H - 8} textAnchor="start" fontSize={9} fill="#999" style={{ direction: "rtl" }}>
+          {faDate(runs[0].at)}
+        </text>
+        {n > 1 && (
+          <text x={w - padX} y={H - 8} textAnchor="end" fontSize={9} fill="#999" style={{ direction: "rtl" }}>
+            {faDate(runs[n - 1].at)}
+          </text>
+        )}
+
+        {/* tap targets + tooltip */}
+        {pts.map((p, i) => (
+          <circle
+            key={`hit-${i}`}
+            cx={p.x}
+            cy={p.y}
+            r={17}
+            fill="transparent"
+            className="cursor-pointer"
+            onClick={() => setSelRun((v) => (v === runs[i] ? null : runs[i]))}
+            onMouseEnter={() => setSelRun(runs[i])}
+          />
+        ))}
+        {selP && selR && (
+          <g className="chart-dot">
+            <rect x={tipX} y={tipY} width={tw} height={th} rx={10} fill="var(--card)" stroke={pctHex(selPct)} strokeWidth={1.5} />
+            <text x={tipX + tw / 2} y={tipY + 20} textAnchor="middle" fontSize={11.5} fontWeight={800} fill={pctHex(selPct)} style={{ direction: "rtl" }}>
+              {faNum(selPct)}٪ — {faNum(selR.score)} از {faNum(selR.total)}
+            </text>
+            <text x={tipX + tw / 2} y={tipY + 37} textAnchor="middle" fontSize={10} fill="#777" style={{ direction: "rtl" }}>
+              {selR.label.length > 18 ? `${selR.label.slice(0, 18)}…` : selR.label}
+            </text>
+            <text x={tipX + tw / 2} y={tipY + 54} textAnchor="middle" fontSize={9} fill="#999" style={{ direction: "rtl" }}>
+              {faDate(selR.at)}
+            </text>
+          </g>
+        )}
+      </svg>
+    </div>
   );
 }
 
 function QuizHistoryCard({ runs }: { runs: QuizRun[] }) {
   const [showAll, setShowAll] = useState(false);
-  // runs arrive newest-first; the chart reads chronologically
-  const chart = useMemo(() => [...runs].slice(0, 14).reverse().map((r) => ({ pct: pctOf(r) })), [runs]);
+  // the chart reads chronologically (oldest first), limited to the last 14 runs
+  const chartRuns = useMemo(() => [...runs].slice(0, 14).reverse(), [runs]);
   const list = useMemo(() => runs.map((r) => ({ ...r, pct: pctOf(r) })), [runs]);
   const stats = useMemo(() => {
     const pcts = list.map((r) => r.pct);
@@ -67,6 +244,7 @@ function QuizHistoryCard({ runs }: { runs: QuizRun[] }) {
       best: pcts.length ? Math.max(...pcts) : 0,
     };
   }, [list]);
+  const trend = useMemo(() => trendDelta(chartRuns.map((r) => pctOf(r))), [chartRuns]);
   const shown = showAll ? list : list.slice(0, 4);
 
   return (
@@ -98,14 +276,41 @@ function QuizHistoryCard({ runs }: { runs: QuizRun[] }) {
         </div>
       </div>
 
-      <div className="rounded-xl bg-muted/40 p-2.5">
-        <p className="mb-1 text-[10px] font-semibold text-muted-foreground">روند نمرات (۱۴ آزمون اخیر)</p>
-        <QuizSparkline runs={chart} />
-        {chart.length < 2 && (
+      <div className="rounded-2xl border border-border/60 bg-gradient-to-b from-muted/30 to-transparent p-2.5">
+        <div className="mb-1 flex items-center justify-between px-1">
+          <p className="text-[11px] font-bold text-muted-foreground">روند نمرات ({faNum(chartRuns.length)} آزمون اخیر)</p>
+          {trend !== null && (
+            <span
+              className={cn(
+                "flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] font-black",
+                trend >= 8
+                  ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                  : trend <= -8
+                    ? "bg-rose-500/15 text-rose-600 dark:text-rose-400"
+                    : "bg-muted text-muted-foreground"
+              )}
+            >
+              {trend >= 8 ? <ArrowUpRight className="h-3 w-3" /> : trend <= -8 ? <ArrowDownRight className="h-3 w-3" /> : <Minus className="h-3 w-3" />}
+              {trend >= 8 ? "روند صعودی" : trend <= -8 ? "روند نزولی" : "روند ثابت"}
+            </span>
+          )}
+        </div>
+        <ScoreChart runs={chartRuns} />
+        {chartRuns.length === 1 && (
+          <p className="pb-1 text-center text-[11px] text-muted-foreground">
+            با آزمون بعدی، نمودار پیشرفت کامل می‌شود — روی نقطه‌ها بزنید
+          </p>
+        )}
+        {chartRuns.length === 0 && (
           <p className="py-3 text-center text-[11px] text-muted-foreground">
             با دو آزمون، نمودار پیشرفت شما اینجا نمایش داده می‌شود
           </p>
         )}
+        <div className="mt-1 flex items-center justify-center gap-4 pb-1 text-[10px] text-muted-foreground">
+          <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-500" /> قوی</span>
+          <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-500" /> متوسط</span>
+          <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-rose-500" /> ضعیف</span>
+        </div>
       </div>
 
       <div className="mt-3 space-y-2">
