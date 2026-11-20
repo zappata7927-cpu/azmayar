@@ -36,7 +36,7 @@ import type { Route } from "@/lib/nav";
 import { useAppStore, planDayKey } from "@/lib/store";
 import { useActivityMedal, type Activity as ActivityInfo } from "@/lib/achievements";
 import { buildTodayPlan, type PlanItem, type TodayPlan } from "@/lib/study-plan";
-import { buildTipPool, pickDailyTip } from "@/lib/tips";
+import { buildTipPool, pickRotatingTip, type Tip } from "@/lib/tips";
 import { GoalDialog } from "@/components/goal-dialog";
 import { formatJalaliLong } from "@/lib/jalali";
 import { faNum, cn } from "@/lib/utils";
@@ -69,11 +69,6 @@ export const GROUP_COLORS: Record<string, string> = {
   "کنترل کیفیت": "bg-emerald-500",
 };
 
-function dayIndex(): number {
-  const d = new Date();
-  return d.getFullYear() * 1000 + d.getMonth() * 40 + d.getDate();
-}
-
 /** cooldown between completing one quiz batch and the next one unlocking (v1.6) */
 const QUIZ_COOLDOWN_MS = 30 * 60 * 1000;
 
@@ -98,12 +93,16 @@ function fmtHm(ms: number): string {
  *  the goal (exam-style goals → question explanations; learning → card facts). */
 function TipCard({ data, navigate, goal, focus }: { data: AppData; navigate: (r: Route) => void; goal: string | null; focus: string[] | null }) {
   const pool = useMemo(() => buildTipPool(data, focus, (goal as "uni" | "hire" | "msc" | "basics" | "pro" | null) ?? null), [data, focus, goal]);
-  const [extra, setExtra] = useState(0);
-  const tip = pickDailyTip(pool, extra);
+  // v1.6.4: a different tip on every app entry — random pick with a no-repeat
+  // window persisted in localStorage (shared with the clinical pearl card)
+  const [tip, setTip] = useState<Tip | null>(null);
+  useEffect(() => {
+    setTip(pickRotatingTip(pool));
+  }, [pool]);
   if (!tip) return null;
   const next = () => {
     void tapHaptic();
-    setExtra((e) => e + 1);
+    setTip(pickRotatingTip(pool));
   };
   return (
     <section>
@@ -124,7 +123,7 @@ function TipCard({ data, navigate, goal, focus }: { data: AppData; navigate: (r:
                 )}
               </div>
               <div className="truncate text-[11px] text-muted-foreground">
-                {tip.source || "آزمـیار"} • {tip.kind === "expl" ? "نکته آزمون" : "نکته مفهومی"}
+                {tip.source || "آزمـیار"} • {tip.kind === "expl" ? "نکته آزمون" : tip.kind === "pearl" ? "نکته بالینی" : "نکته مفهومی"}
               </div>
             </div>
             <button onClick={next} aria-label="نکته بعدی" className="mr-auto grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-muted/60 text-sky-600 transition-colors active:scale-95 dark:text-sky-300">
@@ -160,10 +159,29 @@ function ClinicalPearl({ data, navigate, focus }: { data: AppData; navigate: (r:
   // prefer pearls from the user's chosen topics; fall back to all when too few
   const inFocus = focus && focus.length > 0 ? allPearls.filter((p) => focus.includes(p.cat)) : allPearls;
   const pearls = focus && focus.length > 0 && inFocus.length >= 2 ? inFocus : allPearls;
-  const [idx, setIdx] = useState(() => (pearls.length ? dayIndex() % pearls.length : 0));
-  if (!pearls.length) return null;
-  const pearl = pearls[idx % pearls.length];
-  const next = () => setIdx((Math.floor(Math.random() * pearls.length * 13) + idx + 1) % pearls.length);
+  // v1.6.4: random per app entry with the shared no-repeat window — «نکته بعدی»
+  // also jumps to a random unseen pearl
+  const pool = useMemo<Tip[]>(
+    () =>
+      pearls.map((p) => ({
+        id: `pearl:${(p.text ?? "").trim().slice(0, 48)}`,
+        text: p.text,
+        source: p.test ?? "",
+        tid: p.tid ?? "",
+        kind: "pearl" as const,
+        cat: p.cat,
+      })),
+    [pearls]
+  );
+  const [tip, setTip] = useState<Tip | null>(null);
+  useEffect(() => {
+    setTip(pickRotatingTip(pool));
+  }, [pool]);
+  if (!tip) return null;
+  const next = () => {
+    void tapHaptic();
+    setTip(pickRotatingTip(pool));
+  };
   return (
     <section>
       <div className="relative overflow-hidden rounded-3xl border border-amber-500/25 bg-gradient-to-bl from-amber-400/15 via-orange-300/10 to-amber-100/5 p-4 shadow-sm dark:from-amber-500/10 dark:via-orange-500/8 dark:to-amber-500/5">
@@ -176,14 +194,14 @@ function ClinicalPearl({ data, navigate, focus }: { data: AppData; navigate: (r:
             <div className="min-w-0">
               <div className="flex items-center gap-1.5 text-[13px] font-bold">نکته بالینی</div>
               <div className="truncate text-[11px] text-muted-foreground">
-                {pearl.cat} • {pearl.test}
+                {tip.cat || "آزمـیار"} • {tip.source || "آزمـیار"}
               </div>
             </div>
             <span className="mr-auto grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-muted/60 text-amber-600 transition-colors active:scale-95 dark:text-amber-300" onClick={next} aria-label="نکته بعدی" role="button" tabIndex={0} onKeyDown={(e) => e.key === "Enter" && next()}>
               <Shuffle className="h-4 w-4" />
             </span>
           </div>
-          <p className="mt-3 text-[13.5px] leading-8 text-foreground/90 text-justify">{pearl.text}</p>
+          <p className="mt-3 text-[13.5px] leading-8 text-foreground/90 text-justify">{tip.text}</p>
           <div className="mt-3 flex items-center gap-2">
             <button
               onClick={next}
@@ -191,9 +209,9 @@ function ClinicalPearl({ data, navigate, focus }: { data: AppData; navigate: (r:
             >
               <Shuffle className="h-3.5 w-3.5" /> نکته بعدی
             </button>
-            {pearl.tid && (
+            {tip.tid && (
               <button
-                onClick={() => navigate({ v: "test", id: pearl.tid })}
+                onClick={() => navigate({ v: "test", id: tip.tid })}
                 className="flex items-center gap-1.5 rounded-xl border border-amber-500/40 px-3.5 py-2 text-xs font-bold text-amber-700 transition-colors hover:bg-amber-500/10 dark:text-amber-300"
               >
                 مطالعه مطلب

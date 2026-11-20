@@ -1,6 +1,9 @@
-// Personalized daily tips (v1.5): the pool is built ONLY from the user's chosen
-// topics (studyGoal.focus) and the tip style follows the chosen goal —
-// exam-style goals lean on question explanations, learning goals on card facts.
+// Personalized tips (v1.5→v1.6.4): the pool blends curated clinical pearls
+// (the best practical tips, hand-picked from ALL content areas) with card facts
+// and question explanations, filtered by the user's chosen topics (focus) and
+// weighted by the study goal. v1.6.4: every app entry picks a RANDOM tip —
+// with a no-repeat recent window persisted in localStorage — instead of the
+// old fixed per-day pick.
 import type { AppData } from "./types";
 import type { StudyGoalKey } from "./store";
 
@@ -9,7 +12,9 @@ export interface Tip {
   text: string;
   source: string;
   tid: string;
-  kind: "card" | "expl";
+  kind: "card" | "expl" | "pearl";
+  /** category (only for pearls) — shown as «دسته • مطلب» in the pearl card */
+  cat?: string;
 }
 
 /** interleave a and b taking aPerB items of a per one of b (weighted blend) */
@@ -30,6 +35,21 @@ export function buildTipPool(data: AppData, focus: string[] | null, goal: StudyG
   const ok = (cat: string) => !focus || focus.length === 0 || focus.includes(cat);
   const testName = new Map<string, string>();
   for (const t of data.tests) testName.set(t.id, t.name);
+
+  // curated pearls first — they are the best, most practical tips
+  const pearlTips: Tip[] = [];
+  for (const p of data.pearls ?? []) {
+    const text = (p.text ?? "").trim();
+    if (!text || !ok(p.cat)) continue;
+    pearlTips.push({
+      id: `pearl:${text.slice(0, 48)}`,
+      text,
+      source: (p.test ?? "").trim(),
+      tid: p.tid ?? "",
+      kind: "pearl",
+      cat: p.cat,
+    });
+  }
 
   const cardTips: Tip[] = [];
   for (const c of data.cards) {
@@ -53,23 +73,54 @@ export function buildTipPool(data: AppData, focus: string[] | null, goal: StudyG
   // exam-style goals (uni/hire/msc) → 2 explanations per card tip; learning goals → the reverse
   const examStyle = goal === "hire" || goal === "msc" || goal === "uni";
   const mixed = examStyle ? interleave(explTips, cardTips, 2) : interleave(cardTips, explTips, 2);
+  // pearls interleaved 1-per-1 with the content tips → heavy practical weight
+  const blended = interleave(pearlTips, mixed, 1);
 
   // de-duplicate identical texts (cards and questions can share phrasing)
   const seen = new Set<string>();
   const pool: Tip[] = [];
-  for (const t of mixed) {
+  for (const t of blended) {
     const key = t.text.slice(0, 80);
     if (seen.has(key)) continue;
     seen.add(key);
     pool.push(t);
-    if (pool.length >= 400) break;
+    if (pool.length >= 500) break;
   }
   return pool;
 }
 
-/** deterministic per-day pick; offset>0 = "نکته بعدی" within the same day */
-export function pickDailyTip(pool: Tip[], offset = 0): Tip | null {
+const RECENT_KEY = "azmayar-tip-recent";
+/** how many recently-shown ids to exclude (variety window across app entries) */
+const RECENT_MAX = 16;
+
+/** random pick with no repeat inside a persisted recent window — each app
+ *  entry and each «نکته بعدی» press lands on a different tip; when the whole
+ *  pool has been seen, a fresh pass starts. Shared by both home tip cards so
+ *  they never show the same pearl at once. */
+export function pickRotatingTip(pool: Tip[]): Tip | null {
   if (!pool.length) return null;
-  const day = Math.floor(Date.now() / 86400000);
-  return pool[((day + offset) % pool.length + pool.length) % pool.length];
+  let recent: string[] = [];
+  try {
+    if (typeof window !== "undefined") {
+      const raw = window.localStorage.getItem(RECENT_KEY);
+      if (raw) recent = JSON.parse(raw);
+      if (!Array.isArray(recent)) recent = [];
+    }
+  } catch {
+    recent = [];
+  }
+  const seen = new Set(recent);
+  let candidates = pool.filter((t) => !seen.has(t.id));
+  if (candidates.length === 0) {
+    candidates = pool; // every tip seen recently → start a fresh pass
+    recent = [];
+  }
+  const tip = candidates[Math.floor(Math.random() * candidates.length)];
+  recent = [...recent, tip.id].slice(-RECENT_MAX);
+  try {
+    if (typeof window !== "undefined") window.localStorage.setItem(RECENT_KEY, JSON.stringify(recent));
+  } catch {
+    // storage unavailable — random pick still works, just without memory
+  }
+  return tip;
 }
