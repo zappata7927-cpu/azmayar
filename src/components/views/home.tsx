@@ -33,9 +33,11 @@ import type { Route } from "@/lib/nav";
 import { useAppStore, planDayKey } from "@/lib/store";
 import { useActivityMedal, type Activity as ActivityInfo } from "@/lib/achievements";
 import { buildTodayPlan, type PlanItem, type TodayPlan } from "@/lib/study-plan";
+import { buildTipPool, pickDailyTip } from "@/lib/tips";
 import { GoalDialog } from "@/components/goal-dialog";
 import { formatJalaliLong } from "@/lib/jalali";
 import { faNum, cn } from "@/lib/utils";
+import { tapHaptic } from "@/lib/haptics";
 
 export const GROUP_ICONS: Record<string, LucideIcon> = {
   "بیوشیمی خون": FlaskConical,
@@ -68,8 +70,73 @@ function dayIndex(): number {
   return d.getFullYear() * 1000 + d.getMonth() * 40 + d.getDate();
 }
 
-function ClinicalPearl({ data, navigate }: { data: AppData; navigate: (r: Route) => void }) {
-  const pearls = data.pearls ?? [];
+/** «نکته امروز» — personalized by the chosen goal and topics (v1.5): the pool
+ *  only holds content from the selected categories and the tip style follows
+ *  the goal (exam-style goals → question explanations; learning → card facts). */
+function TipCard({ data, navigate, goal, focus }: { data: AppData; navigate: (r: Route) => void; goal: string | null; focus: string[] | null }) {
+  const pool = useMemo(() => buildTipPool(data, focus, (goal as "uni" | "hire" | "msc" | "basics" | "pro" | null) ?? null), [data, focus, goal]);
+  const [extra, setExtra] = useState(0);
+  const tip = pickDailyTip(pool, extra);
+  if (!tip) return null;
+  const next = () => {
+    void tapHaptic();
+    setExtra((e) => e + 1);
+  };
+  return (
+    <section>
+      <div className="relative overflow-hidden rounded-3xl border border-sky-500/25 bg-gradient-to-bl from-sky-400/15 via-cyan-300/10 to-sky-100/5 p-4 shadow-sm dark:from-sky-500/10 dark:via-cyan-500/8 dark:to-sky-500/5">
+        <div className="absolute -left-8 -top-8 h-24 w-24 rounded-full bg-sky-400/15 blur-2xl" />
+        <div className="relative">
+          <div className="flex items-center gap-2">
+            <span className="grid h-9 w-9 place-items-center rounded-2xl bg-sky-500/15 text-sky-600 dark:text-sky-300">
+              <Lightbulb className="h-4.5 w-4.5" />
+            </span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 text-[13px] font-bold">
+                نکته امروز
+                {focus && focus.length > 0 && (
+                  <span className="rounded-md bg-sky-500/15 px-1.5 py-0.5 text-[9px] font-black text-sky-700 dark:text-sky-300">
+                    {faNum(focus.length)} موضوع شما
+                  </span>
+                )}
+              </div>
+              <div className="truncate text-[11px] text-muted-foreground">
+                {tip.source || "آزمـیار"} • {tip.kind === "expl" ? "نکته آزمون" : "نکته مفهومی"}
+              </div>
+            </div>
+            <button onClick={next} aria-label="نکته بعدی" className="mr-auto grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-muted/60 text-sky-600 transition-colors active:scale-95 dark:text-sky-300">
+              <Shuffle className="h-4 w-4" />
+            </button>
+          </div>
+          <p className="mt-3 text-[13.5px] leading-8 text-foreground/90 text-justify">{tip.text}</p>
+          <div className="mt-3 flex items-center gap-2">
+            <button
+              onClick={next}
+              className="flex items-center gap-1.5 rounded-xl bg-sky-500/15 px-3.5 py-2 text-xs font-bold text-sky-700 transition-transform active:scale-95 dark:text-sky-300"
+            >
+              <Shuffle className="h-3.5 w-3.5" /> نکته بعدی
+            </button>
+            {tip.tid && (
+              <button
+                onClick={() => navigate({ v: "test", id: tip.tid })}
+                className="flex items-center gap-1.5 rounded-xl border border-sky-500/40 px-3.5 py-2 text-xs font-bold text-sky-700 transition-colors hover:bg-sky-500/10 dark:text-sky-300"
+              >
+                مطالعه مطلب
+                <ArrowLeftIcon className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ClinicalPearl({ data, navigate, focus }: { data: AppData; navigate: (r: Route) => void; focus: string[] | null }) {
+  const allPearls = data.pearls ?? [];
+  // prefer pearls from the user's chosen topics; fall back to all when too few
+  const inFocus = focus && focus.length > 0 ? allPearls.filter((p) => focus.includes(p.cat)) : allPearls;
+  const pearls = focus && focus.length > 0 && inFocus.length >= 2 ? inFocus : allPearls;
   const [idx, setIdx] = useState(() => (pearls.length ? dayIndex() % pearls.length : 0));
   if (!pearls.length) return null;
   const pearl = pearls[idx % pearls.length];
@@ -395,7 +462,9 @@ export function HomeView({ data, navigate }: {  data: AppData;
         onNavigate={navigate}
         onPickGoal={() => setGoalOpen(true)}
       />
-      <GoalDialog open={goalOpen} onOpenChange={setGoalOpen} />
+      {/* Personalized daily tip — scoped to the chosen goal/topics (v1.5) */}
+      <TipCard data={data} navigate={navigate} goal={studyGoal.goal} focus={studyGoal.focus} />
+      <GoalDialog open={goalOpen} onOpenChange={setGoalOpen} data={data} />
 
       {/* Honorary medal — encourages continued useful use of the app */}
       <MedalCard activity={activity} />
@@ -471,7 +540,7 @@ export function HomeView({ data, navigate }: {  data: AppData;
       )}
 
       {/* Random clinical pearl */}
-      <ClinicalPearl data={data} navigate={navigate} />
+      <ClinicalPearl data={data} navigate={navigate} focus={studyGoal.focus} />
     </div>
   );
 }

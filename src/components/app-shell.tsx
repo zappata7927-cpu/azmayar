@@ -251,7 +251,13 @@ function SettingsSheet({ data }: { data: AppData }) {
               </span>
               <ChevronLeft className="h-4 w-4 shrink-0 text-muted-foreground/50" />
             </button>
-            <GoalDialog open={goalOpen} onOpenChange={setGoalOpen} />
+            <GoalDialog open={goalOpen} onOpenChange={setGoalOpen} data={data} />
+            {studyGoal.focus && studyGoal.focus.length > 0 && (
+              <p className="mt-2 rounded-xl bg-primary/5 px-3 py-2 text-[11px] font-bold leading-5 text-primary">
+                {faNum(studyGoal.focus.length)} موضوع انتخابی: {studyGoal.focus.slice(0, 4).join("، ")}
+                {studyGoal.focus.length > 4 ? " و …" : ""}
+              </p>
+            )}
           </div>
           <div>
             <p className="mb-2.5 text-sm font-bold">حالت نمایش</p>

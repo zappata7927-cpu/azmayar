@@ -79,6 +79,8 @@ export function buildTodayPlan(
 ): TodayPlan {
   const now = opts.now ?? Date.now();
   const goal = opts.studyGoal.goal ? GOALS.find((g) => g.key === opts.studyGoal.goal) ?? null : null;
+  // topic filter (v1.5): the user may scope the whole plan to chosen categories
+  const focus = opts.studyGoal.focus && opts.studyGoal.focus.length > 0 ? opts.studyGoal.focus : null;
 
   // ----- days left to the exam -----
   let daysLeft: number | null = null;
@@ -90,7 +92,7 @@ export function buildTodayPlan(
     }
   }
 
-  // ----- per-test aggregation -----
+  // ----- per-test aggregation (scoped to the chosen topics when set) -----
   const testName = new Map<string, string>();
   for (const t of data.tests) testName.set(t.id, t.name);
   const agg = new Map<string, TestAgg>();
@@ -102,34 +104,47 @@ export function buildTodayPlan(
     }
     return a;
   };
-  for (const c of data.cards) {
-    const a = get(c.tid);
-    a.totalCards += 1;
-    const st = opts.leitner[c.id];
-    if (!st || st.due <= now) a.dueCards += 1;
-    if (st && st.box > 0) a.boxSum += st.box;
-  }
-  for (const q of data.questions) {
-    const a = get(q.tid);
-    a.qCount += 1;
-    const s = opts.qstats[q.id];
-    if (s && s.seen > 0) {
-      a.attempts += s.seen;
-      a.ok += s.ok;
+  const cardCount = { n: 0 };
+  const qCount = { n: 0 };
+  const aggregate = (respectFocus: boolean) => {
+    agg.clear();
+    cardCount.n = 0;
+    qCount.n = 0;
+    const ok = (cat: string) => !respectFocus || !focus || focus.includes(cat);
+    for (const c of data.cards) {
+      if (!ok(c.cat)) continue;
+      cardCount.n += 1;
+      const a = get(c.tid);
+      a.totalCards += 1;
+      const st = opts.leitner[c.id];
+      if (!st || st.due <= now) a.dueCards += 1;
+      if (st && st.box > 0) a.boxSum += st.box;
     }
-  }
+    for (const q of data.questions) {
+      if (!ok(q.cat)) continue;
+      qCount.n += 1;
+      const a = get(q.tid);
+      a.qCount += 1;
+      const s = opts.qstats[q.id];
+      if (s && s.seen > 0) {
+        a.attempts += s.seen;
+        a.ok += s.ok;
+      }
+    }
+  };
+  aggregate(true);
 
   // ----- quotas: exam date → pace from remaining days × content volume; else the
   // user's own "cards per session" setting drives the day -----
   const dailyCards = Math.max(5, opts.settings.dailyCards);
   let cardsQuota = dailyCards;
   if (daysLeft !== null && daysLeft > 0) {
-    // review the whole card bank roughly twice before the exam
-    cardsQuota = Math.max(5, Math.min(50, Math.ceil((data.cards.length * 2) / daysLeft)));
+    // review the whole (scoped) card bank roughly twice before the exam
+    cardsQuota = Math.max(5, Math.min(50, Math.ceil((cardCount.n * 2) / daysLeft)));
   }
   let quizQuota = Math.max(5, Math.min(40, Math.round((cardsQuota * (goal?.quizWeight ?? 0.6)) * 0.5)));
   if (daysLeft !== null && daysLeft > 0) {
-    quizQuota = Math.max(5, Math.min(40, Math.ceil((data.questions.length * 1.2) / daysLeft)));
+    quizQuota = Math.max(5, Math.min(40, Math.ceil((qCount.n * 1.2) / daysLeft)));
   }
 
   const items: PlanItem[] = [];
@@ -178,6 +193,15 @@ export function buildTodayPlan(
     qLeft -= n;
   });
 
+  // ----- graceful fallback: chosen topics with (almost) no content → all topics -----
+  let focusNote = "";
+  if (focus && items.length === 0 && (cardCount.n >= 5 || qCount.n >= 5)) {
+    // scoped content exists but produced no items (e.g. everything reviewed) — keep scoped
+  } else if (focus && cardCount.n < 5 && qCount.n < 5) {
+    aggregate(false);
+    focusNote = "موضوعات انتخابی محتوای کافی ندارند؛ فعلاً از همه موضوعات برنامه ساخته شد.";
+  }
+
   // ----- yesterday's (and older) mistakes -----
   const mCount = Object.keys(opts.mistakes ?? {}).length;
   if (mCount >= 3) {
@@ -191,12 +215,14 @@ export function buildTodayPlan(
   }
 
   let note: string;
-  if (daysLeft !== null && daysLeft > 0) {
-    note = `تا ${goal?.title ?? "آزمون"} ${faNum(daysLeft)} روز مانده؛ حجم امروز بر اساس روزهای باقی‌مانده و کل محتوای اپ تنظیم شده است.`;
+  if (focusNote) {
+    note = focusNote;
+  } else if (daysLeft !== null && daysLeft > 0) {
+    note = `تا ${goal?.title ?? "آزمون"} ${faNum(daysLeft)} روز مانده؛ حجم امروز بر اساس روزهای باقی‌مانده و محتوای ${focus ? "موضوعات انتخابی" : "کل"} اپ تنظیم شده است.`;
   } else if (daysLeft === 0) {
     note = "تاریخ آزمون شما رسیده یا گذشته است — برای برنامه جدید، تاریخ را به‌روزرسانی کنید.";
   } else if (goal) {
-    note = `برنامه مستمر بر اساس هدف «${goal.title}»، تنظیمات روزانه شما و نقاط ضعف‌تان؛ آزمون‌های برنامه زمان‌دار هستند.`;
+    note = `برنامه مستمر بر اساس هدف «${goal.title}»${focus ? ` و موضوعات انتخابی شما (${focus.slice(0, 3).join("، ")})` : ""}؛ آزمون‌های برنامه زمان‌دار هستند.`;
   } else {
     note = "برای شخصی‌سازی کامل برنامه، هدف مطالعه‌تان را انتخاب کنید.";
   }

@@ -38,6 +38,8 @@ export interface StudyGoal {
   goal: StudyGoalKey | null;
   /** exam date "YYYY-MM-DD" (only for exam-style goals) */
   examDate: string | null;
+  /** topic filter: category names the plan/tips/quiz scope to; null or empty = all topics */
+  focus: string[] | null;
 }
 
 export const GOAL_TITLES: Record<StudyGoalKey, string> = {
@@ -154,6 +156,10 @@ function sanitize(st: Partial<AppState> | undefined): Partial<AppState> {
       st.studyGoal && typeof st.studyGoal === "object" && typeof st.studyGoal.examDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(st.studyGoal.examDate)
         ? st.studyGoal.examDate
         : null,
+    focus:
+      st.studyGoal && typeof st.studyGoal === "object" && Array.isArray(st.studyGoal.focus)
+        ? st.studyGoal.focus.filter((x) => typeof x === "string" && x).slice(0, 30)
+        : null,
   };
   const planDone: Record<string, string[]> = {};
   if (st.planDone && typeof st.planDone === "object") {
@@ -180,7 +186,7 @@ export const useAppStore = create<AppState>()(
       quizHistory: [],
       mistakes: {},
       qstats: {},
-      studyGoal: { goal: null, examDate: null },
+      studyGoal: { goal: null, examDate: null, focus: null },
       planDone: {},
       settings: DEFAULT_SETTINGS,
       toggleFav: (id) =>
