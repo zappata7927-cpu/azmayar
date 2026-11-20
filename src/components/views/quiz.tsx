@@ -8,7 +8,7 @@ import type { Route } from "@/lib/nav";
 import { useAppStore, type QuizRun } from "@/lib/store";
 import { buildQuiz, quizCountsFor, type QuizMode, type QuizSession } from "@/lib/quiz";
 import { QUIZ_TICK_PCT, matchingPlanIds } from "@/lib/study-plan";
-import { Celebration } from "@/components/celebration";
+import { Celebration, tierForPct } from "@/components/celebration";
 import { faNum, cn } from "@/lib/utils";
 import { tapHaptic } from "@/lib/haptics";
 import { toast } from "sonner";
@@ -602,7 +602,7 @@ export function QuizView({ data, navigate, route }: { data: AppData; navigate: (
     const Icon = msg.i;
     return (
       <div className="space-y-5">
-        {pct === 100 && <Celebration />}
+        {<Celebration tier={tierForPct(pct)} />}
         <div className="rounded-3xl border bg-card p-6 text-center shadow-md">
           <Icon className={cn("mx-auto h-10 w-10", msg.c)} />
           <p className="mt-2 text-lg font-black">{msg.t}</p>

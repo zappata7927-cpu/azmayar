@@ -1,21 +1,21 @@
-// Whisper-light tap feedback: one tiny native "tick" — the faintest, shortest
-// pulse the engine offers (barely a dot under the finger, over in a blink).
+// Keyboard-typing micro feedback: a ~6 ms, barely-there blip — weaker and
+// shorter than any native click effect, like a soft key-press tick.
 // Silently does nothing on web so the PWA experience is unchanged.
 import { Capacitor } from "@capacitor/core";
 
 let lastTick = 0;
 
-/** ultra-light micro-tick for buttons / options / actions */
+/** ultra-soft key-press style blip for buttons / options / actions */
 export async function tapHaptic(): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
   const now = Date.now();
   if (now - lastTick < 120) return; // collapse double fires (direct call + global listener)
   lastTick = now;
   try {
-    const { Haptics, ImpactStyle } = await import("@capacitor/haptics");
-    // light impact = the subtle native tick (EFFECT_TICK on Android): a tiny,
-    // low-energy dot of a pulse — far weaker and shorter than a vibration
-    await Haptics.impact({ style: ImpactStyle.Light });
+    const { Haptics } = await import("@capacitor/haptics");
+    // raw short vibration: 6 ms is both weaker and briefer than the native
+    // impact effects (EFFECT_TICK runs ~20-30 ms) — closest to keyboard typing
+    await Haptics.vibrate({ duration: 6 });
   } catch {
     // haptics unavailable (permission missing, unsupported device) — ignore
   }

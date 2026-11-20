@@ -23,7 +23,7 @@ import { useAppStore } from "@/lib/store";
 import { categoryPerformance, pickAdaptiveQuestions } from "@/lib/adaptive";
 import { randomizeOptions } from "@/lib/quiz";
 import { QUIZ_TICK_PCT, matchingPlanIds } from "@/lib/study-plan";
-import { Celebration } from "@/components/celebration";
+import { Celebration, tierForPct } from "@/components/celebration";
 import { faNum, cn } from "@/lib/utils";
 import { tapHaptic } from "@/lib/haptics";
 
@@ -415,7 +415,7 @@ export function SessionView({ data, navigate, route }: { data: AppData; navigate
 
   return (
     <div className="space-y-5">
-      {isQuizDone && pct === 100 && <Celebration />}
+      {<Celebration tier={tierForPct(pct)} />}
       <div className="rounded-3xl border bg-card p-6 text-center shadow-md">
         <PartyPopper className={cn("mx-auto h-9 w-9", msg.c)} />
         <p className="mt-2 text-lg font-black">{isQuizDone ? "کارنامه جلسه" : "جلسه مرور تمام شد"}</p>

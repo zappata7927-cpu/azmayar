@@ -361,3 +361,107 @@
     opacity: 1;
   }
 }
+
+/* ---------- tiered result fx (v1.6.3) ---------- */
+@keyframes fx-twinkle {
+  0%,
+  100% {
+    transform: scale(0.55);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+}
+.fx-twinkle {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: fx-twinkle 1.5s ease-in-out infinite;
+}
+
+@keyframes fx-rise {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-4deg);
+  }
+  50% {
+    transform: translateY(-9px) rotate(4deg);
+  }
+}
+.fx-rise {
+  animation: fx-rise 2.4s ease-in-out infinite;
+}
+
+@keyframes fx-flame {
+  0%,
+  100% {
+    transform: scaleY(1);
+  }
+  50% {
+    transform: scaleY(1.3);
+  }
+}
+.fx-flame {
+  transform-box: fill-box;
+  transform-origin: center top;
+  animation: fx-flame 0.3s ease-in-out infinite;
+}
+
+@keyframes fx-drop {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(15px);
+    opacity: 0;
+  }
+}
+.fx-drop {
+  animation: fx-drop 1.4s linear infinite;
+}
+
+@keyframes fx-sway {
+  0%,
+  100% {
+    transform: rotate(-3deg);
+  }
+  50% {
+    transform: rotate(3deg);
+  }
+}
+.fx-sway {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: fx-sway 3.2s ease-in-out infinite;
+}
+
+@keyframes fx-grow {
+  from {
+    transform: scale(0);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+.fx-grow {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation: fx-grow 0.55s ease-out 1.25s both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fx-twinkle,
+  .fx-rise,
+  .fx-flame,
+  .fx-drop,
+  .fx-sway,
+  .fx-grow {
+    animation: none;
+    opacity: 1;
+  }
+}

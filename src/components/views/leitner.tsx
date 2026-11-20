@@ -23,6 +23,7 @@ import { faNum } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { tapHaptic } from "@/lib/haptics";
 import { pullWidgetState } from "@/lib/widget-bridge";
+import { Celebration, tierForPct } from "@/components/celebration";
 
 const BOX_LABELS = ["جدید", "جعبه ۱", "جعبه ۲", "جعبه ۳", "جعبه ۴", "جعبه ۵"];
 const BOX_COLORS = ["bg-slate-400", "bg-rose-400", "bg-amber-400", "bg-teal-400", "bg-emerald-500", "bg-emerald-600"];
@@ -76,6 +77,8 @@ export function LeitnerView({ data, navigate }: { data: AppData; navigate: (r: R
   const [pos, setPos] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [results, setResults] = useState<{ good: number; bad: number }>({ good: 0, bad: 0 });
+  // finished session summary (v1.6.3) — drives the tiered result animation
+  const [finished, setFinished] = useState<{ good: number; bad: number; label: string } | null>(null);
 
   const info = useMemo(() => leitnerInfo(data, leitner), [data, leitner]);
 
@@ -86,6 +89,7 @@ export function LeitnerView({ data, navigate }: { data: AppData; navigate: (r: R
 
   const beginSession = (cards: SessionCard[], label: string) => {
     if (!cards.length) return;
+    setFinished(null);
     setSession(cards);
     setSessionLabel(label);
     setPos(0);
@@ -117,12 +121,15 @@ export function LeitnerView({ data, navigate }: { data: AppData; navigate: (r: R
     void tapHaptic();
     const cur = session![pos];
     answerCard(cur.card.id, good);
-    setResults((r) => ({ good: r.good + (good ? 1 : 0), bad: r.bad + (good ? 0 : 1) }));
+    const g = results.good + (good ? 1 : 0);
+    const b = results.bad + (good ? 0 : 1);
+    setResults({ good: g, bad: b });
     if (pos + 1 >= session!.length) {
-      // finish
+      // finish — land on the session summary with the tiered result animation
       setSession(null);
       setPos(0);
-      const pct = Math.round(((results.good + (good ? 1 : 0)) / session!.length) * 100);
+      setFinished({ good: g, bad: b, label: sessionLabel });
+      const pct = Math.round((g / session!.length) * 100);
       toast.success(`${sessionLabel} تمام شد — دقت ${faNum(pct)}٪`);
     } else {
       setPos(pos + 1);
@@ -219,6 +226,49 @@ export function LeitnerView({ data, navigate }: { data: AppData; navigate: (r: R
         >
           پایان جلسه
         </button>
+      </div>
+    );
+  }
+
+  // ---------- session result (v1.6.3) — summary card + tiered animation ----------
+  if (finished) {
+    const total = Math.max(finished.good + finished.bad, 1);
+    const pct = Math.round((finished.good / total) * 100);
+    return (
+      <div className="space-y-5">
+        <Celebration tier={tierForPct(pct)} />
+        <div className="rounded-3xl border bg-card p-6 text-center shadow-md">
+          <PartyPopper className="mx-auto h-9 w-9 text-emerald-500" />
+          <p className="mt-2 text-lg font-black">جلسه مرور تمام شد</p>
+          <p className="mt-1 text-xs text-muted-foreground">{finished.label}</p>
+          <div className="mx-auto mt-5 grid h-32 w-32 place-items-center rounded-full" style={{ background: `conic-gradient(var(--primary) ${pct}%, var(--muted) 0)` }}>
+            <div className="grid h-[104px] w-[104px] place-items-center rounded-full bg-card">
+              <div>
+                <div className="text-2xl font-black">{faNum(pct)}٪</div>
+                <div className="text-[11px] text-muted-foreground">دقت جلسه</div>
+              </div>
+            </div>
+          </div>
+          <div className="mx-auto mt-5 grid max-w-[220px] grid-cols-2 gap-3">
+            <div className="rounded-xl bg-emerald-500/10 p-2.5">
+              <div className="text-sm font-black text-emerald-600 dark:text-emerald-400">✓ {faNum(finished.good)}</div>
+              <div className="text-[10px] text-muted-foreground">بلد بودم</div>
+            </div>
+            <div className="rounded-xl bg-rose-500/10 p-2.5">
+              <div className="text-sm font-black text-rose-600 dark:text-rose-400">✗ {faNum(finished.bad)}</div>
+              <div className="text-[10px] text-muted-foreground">بلد نبودم</div>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              void tapHaptic();
+              setFinished(null);
+            }}
+            className="mt-6 flex min-h-[48px] w-full items-center justify-center gap-2 rounded-2xl bg-primary font-bold text-white transition-transform active:scale-[0.98]"
+          >
+            <Layers className="h-4.5 w-4.5" /> بازگشت به جعبه لایتنر
+          </button>
+        </div>
       </div>
     );
   }
