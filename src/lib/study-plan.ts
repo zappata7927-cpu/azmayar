@@ -1,12 +1,13 @@
-// Daily study plan (v1.3): turns the user's chosen goal, the time left to the
+// Daily study plan (v1.4): turns the user's chosen goal, the time left to the
 // exam, the volume of the content and past performance into a concrete
 // "برنامه امروز" checklist, so the user never has to decide what to study.
+// Since v1.4 items are scoped at the TEST level («۶ کارت مورفولوژی پلاکت‌ها»)
+// and open a guided, timed session view instead of the generic leitner/quiz.
 import { Briefcase, GraduationCap, Library, Rocket, Sparkles, type LucideIcon } from "lucide-react";
 import type { Route } from "./nav";
 import type { LeitnerState, QuestionStat, Settings, StudyGoal, StudyGoalKey } from "./store";
 import { GOAL_TITLES } from "./store";
 import type { AppData } from "./types";
-import { categoryPerformance } from "./adaptive";
 import { faNum } from "./utils";
 
 export interface GoalInfo {
@@ -33,7 +34,8 @@ export interface PlanItem {
   kind: "cards" | "quiz" | "mistakes";
   title: string;
   detail: string;
-  cat?: string;
+  /** test id the session is scoped to */
+  tid?: string;
   route: Route;
 }
 
@@ -43,6 +45,25 @@ export interface TodayPlan {
   daysLeft: number | null;
   goalTitle: string | null;
   note: string;
+}
+
+interface TestAgg {
+  tid: string;
+  name: string;
+  dueCards: number;
+  totalCards: number;
+  boxSum: number;
+  qCount: number;
+  attempts: number;
+  ok: number;
+}
+
+/** per-test weakness 0..1 (0.55 quiz accuracy + 0.45 card mastery; unknown → 0.5) */
+function testWeakness(t: TestAgg): number {
+  const acc = t.attempts > 0 ? t.ok / t.attempts : 0.5;
+  const quizWeak = t.attempts >= 4 ? 1 - acc : 0.5;
+  const cardWeak = t.totalCards > 0 ? 1 - t.boxSum / (t.totalCards * 5) : 0.5;
+  return Math.max(0, Math.min(1, 0.55 * quizWeak + 0.45 * cardWeak));
 }
 
 export function buildTodayPlan(
@@ -57,7 +78,6 @@ export function buildTodayPlan(
   }
 ): TodayPlan {
   const now = opts.now ?? Date.now();
-  const perf = categoryPerformance(data, opts.leitner, opts.qstats);
   const goal = opts.studyGoal.goal ? GOALS.find((g) => g.key === opts.studyGoal.goal) ?? null : null;
 
   // ----- days left to the exam -----
@@ -70,11 +90,33 @@ export function buildTodayPlan(
     }
   }
 
-  // ----- due cards per cat -----
-  const dueByCat = new Map<string, number>();
+  // ----- per-test aggregation -----
+  const testName = new Map<string, string>();
+  for (const t of data.tests) testName.set(t.id, t.name);
+  const agg = new Map<string, TestAgg>();
+  const get = (tid: string): TestAgg => {
+    let a = agg.get(tid);
+    if (!a) {
+      a = { tid, name: testName.get(tid) ?? tid, dueCards: 0, totalCards: 0, boxSum: 0, qCount: 0, attempts: 0, ok: 0 };
+      agg.set(tid, a);
+    }
+    return a;
+  };
   for (const c of data.cards) {
+    const a = get(c.tid);
+    a.totalCards += 1;
     const st = opts.leitner[c.id];
-    if (!st || st.due <= now) dueByCat.set(c.cat, (dueByCat.get(c.cat) ?? 0) + 1);
+    if (!st || st.due <= now) a.dueCards += 1;
+    if (st && st.box > 0) a.boxSum += st.box;
+  }
+  for (const q of data.questions) {
+    const a = get(q.tid);
+    a.qCount += 1;
+    const s = opts.qstats[q.id];
+    if (s && s.seen > 0) {
+      a.attempts += s.seen;
+      a.ok += s.ok;
+    }
   }
 
   // ----- quotas: exam date → pace from remaining days × content volume; else the
@@ -92,50 +134,46 @@ export function buildTodayPlan(
 
   const items: PlanItem[] = [];
 
-  // ----- cards across the weakest cats that actually have due cards -----
-  const cardCats = [...perf.values()]
-    .filter((p) => (dueByCat.get(p.cat) ?? 0) >= 3)
-    .sort((a, b) => b.weakness - a.weakness)
+  // ----- cards across the weakest tests that actually have due cards -----
+  const cardTests = [...agg.values()]
+    .filter((a) => a.dueCards >= 2)
+    .sort((a, b) => testWeakness(b) - testWeakness(a) || b.dueCards - a.dueCards)
     .slice(0, 3);
   let cardsLeft = cardsQuota;
-  cardCats.forEach((p, i) => {
-    const avail = dueByCat.get(p.cat) ?? 0;
-    if (cardsLeft < 5 || avail <= 0) return;
-    const share = i === cardCats.length - 1 ? cardsLeft : Math.max(5, Math.min(avail, Math.round(cardsQuota / cardCats.length)));
-    const n = Math.min(share, avail, cardsLeft);
-    if (n < 5) return;
+  cardTests.forEach((a, i) => {
+    if (cardsLeft < 2) return;
+    const share = i === cardTests.length - 1 ? cardsLeft : Math.round(cardsQuota / cardTests.length);
+    const n = Math.min(Math.max(2, share), a.dueCards, cardsLeft);
+    if (n < 2) return;
     items.push({
-      id: `cards:${p.cat}`,
+      id: `cards:${a.tid}`,
       kind: "cards",
-      title: `${faNum(n)} کارت ${p.cat}`,
-      detail: "مرور کارت‌های آماده این مبحث در جعبه لایتنر",
-      cat: p.cat,
-      route: { v: "leitner" },
+      title: `${faNum(n)} کارت ${a.name}`,
+      detail: "جلسه مرور دقیقاً همین کارت‌ها",
+      tid: a.tid,
+      route: { v: "session", kind: "cards", id: a.tid, count: n },
     });
     cardsLeft -= n;
   });
 
-  // ----- adaptive quiz from the weakest cats -----
-  const qCountByCat = new Map<string, number>();
-  for (const q of data.questions) qCountByCat.set(q.cat, (qCountByCat.get(q.cat) ?? 0) + 1);
-  const quizCats = [...perf.values()]
-    .filter((p) => (qCountByCat.get(p.cat) ?? 0) >= 5)
-    .sort((a, b) => b.weakness - a.weakness)
+  // ----- timed adaptive quiz from the weakest tests -----
+  const quizTests = [...agg.values()]
+    .filter((a) => a.qCount >= 5)
+    .sort((a, b) => testWeakness(b) - testWeakness(a) || b.attempts - a.attempts)
     .slice(0, 2);
   let qLeft = quizQuota;
-  quizCats.forEach((p, i) => {
-    const avail = qCountByCat.get(p.cat) ?? 0;
-    if (qLeft < 5 || avail <= 0) return;
-    const share = i === quizCats.length - 1 ? qLeft : Math.max(5, Math.min(avail, Math.round(quizQuota * (i === 0 ? 0.6 : 0.4))));
-    const n = Math.min(share, avail, qLeft);
+  quizTests.forEach((a, i) => {
+    if (qLeft < 5) return;
+    const share = i === quizTests.length - 1 ? qLeft : Math.round(quizQuota * (i === 0 ? 0.6 : 0.4));
+    const n = Math.min(Math.max(5, share), a.qCount, qLeft);
     if (n < 5) return;
     items.push({
-      id: `quiz:${p.cat}`,
+      id: `quiz:${a.tid}`,
       kind: "quiz",
-      title: `${faNum(n)} سؤال ${p.cat}`,
-      detail: "آزمون هوشمند با مرور فاصله‌دار",
-      cat: p.cat,
-      route: { v: "quiz", cat: p.cat, count: n },
+      title: `${faNum(n)} سؤال ${a.name}`,
+      detail: "آزمون زمان‌دار همان مبحث (۶۰ ثانیه برای هر سؤال)",
+      tid: a.tid,
+      route: { v: "session", kind: "quiz", id: a.tid, count: n },
     });
     qLeft -= n;
   });
@@ -147,8 +185,8 @@ export function buildTodayPlan(
       id: "mistakes",
       kind: "mistakes",
       title: `مرور ${faNum(Math.min(mCount, 20))} سؤال اشتباه`,
-      detail: "سؤال‌هایی که قبلاً نادرست پاسخ داده‌اید",
-      route: { v: "quiz", mode: "mistakes" },
+      detail: "آزمون زمان‌دار سؤال‌هایی که نادرست پاسخ داده‌اید",
+      route: { v: "session", kind: "mistakes" },
     });
   }
 
@@ -156,9 +194,9 @@ export function buildTodayPlan(
   if (daysLeft !== null && daysLeft > 0) {
     note = `تا ${goal?.title ?? "آزمون"} ${faNum(daysLeft)} روز مانده؛ حجم امروز بر اساس روزهای باقی‌مانده و کل محتوای اپ تنظیم شده است.`;
   } else if (daysLeft === 0) {
-    note = "تاریخ آزمون شما رسیده یا گذشته است — برای برنامه جدید، تاریخ را در تنظیمات به‌روزرسانی کنید.";
+    note = "تاریخ آزمون شما رسیده یا گذشته است — برای برنامه جدید، تاریخ را به‌روزرسانی کنید.";
   } else if (goal) {
-    note = `برنامه مستمر بر اساس هدف «${goal.title}»، تنظیمات روزانه شما و نقاط ضعف‌تان.`;
+    note = `برنامه مستمر بر اساس هدف «${goal.title}»، تنظیمات روزانه شما و نقاط ضعف‌تان؛ آزمون‌های برنامه زمان‌دار هستند.`;
   } else {
     note = "برای شخصی‌سازی کامل برنامه، هدف مطالعه‌تان را انتخاب کنید.";
   }

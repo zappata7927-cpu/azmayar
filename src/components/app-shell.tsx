@@ -53,6 +53,7 @@ import { CategoriesView, CategoryView } from "@/components/views/categories";
 import { TestView } from "@/components/views/test";
 import { LeitnerView } from "@/components/views/leitner";
 import { QuizView } from "@/components/views/quiz";
+import { SessionView } from "@/components/views/session";
 import { AboutView } from "@/components/views/about";
 import { InterpretView } from "@/components/views/interpret";
 import { ViewErrorBoundary } from "@/components/error-boundary";
@@ -61,6 +62,7 @@ import { initReminder } from "@/lib/reminder";
 import { tapHaptic } from "@/lib/haptics";
 import { GoalDialog } from "@/components/goal-dialog";
 import { GOALS } from "@/lib/study-plan";
+import { formatJalaliLong } from "@/lib/jalali";
 import { App } from "@capacitor/app";
 import { cn, faNum } from "@/lib/utils";
 
@@ -241,7 +243,7 @@ function SettingsSheet({ data }: { data: AppData }) {
                 <span className="block text-sm font-semibold">{currentGoal ? currentGoal.title : "انتخاب نشده"}</span>
                 <span className="block text-[11px] text-muted-foreground">
                   {currentGoal && studyGoal.examDate
-                    ? `تاریخ آزمون: ${new Date(studyGoal.examDate).toLocaleDateString("fa-IR")}`
+                    ? `تاریخ آزمون: ${formatJalaliLong(studyGoal.examDate)}`
                     : currentGoal
                       ? currentGoal.desc
                       : "برای برنامه مطالعه روزانه انتخاب کنید"}
@@ -491,6 +493,7 @@ export function AppShell() {
           {route.v === "test" && <TestView data={data} id={route.id} navigate={navigate} />}
           {route.v === "leitner" && <LeitnerView data={data} navigate={navigate} />}
           {route.v === "quiz" && <QuizView data={data} navigate={navigate} route={route} />}
+          {route.v === "session" && <SessionView data={data} navigate={navigate} route={route} />}
           {route.v === "interpret" && <InterpretView data={data} />}
           {route.v === "about" && <AboutView data={data} />}
         </ViewErrorBoundary>

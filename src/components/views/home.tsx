@@ -13,6 +13,7 @@ import {
   CalendarDays,
   Target,
   Check,
+  Pencil,
   ChevronLeft as GoLeft,
   Shuffle,
   ChevronLeft as ArrowLeftIcon,
@@ -33,6 +34,7 @@ import { useAppStore, planDayKey } from "@/lib/store";
 import { useActivityMedal, type Activity as ActivityInfo } from "@/lib/achievements";
 import { buildTodayPlan, type PlanItem, type TodayPlan } from "@/lib/study-plan";
 import { GoalDialog } from "@/components/goal-dialog";
+import { formatJalaliLong } from "@/lib/jalali";
 import { faNum, cn } from "@/lib/utils";
 
 export const GROUP_ICONS: Record<string, LucideIcon> = {
@@ -192,10 +194,12 @@ function MedalCard({ activity: a }: { activity: ActivityInfo }) {
 }
 
 /** «برنامه امروز» — a checkable daily plan built from the user's goal, exam
- *  countdown, content volume and past performance (v1.3). */
+ *  countdown, content volume and past performance (v1.4: items open guided
+ *  sessions; the goal and its Jalali exam date are editable anytime). */
 function TodayPlanCard({
   plan,
   goalSet,
+  examDate,
   done,
   onToggle,
   onNavigate,
@@ -203,6 +207,7 @@ function TodayPlanCard({
 }: {
   plan: TodayPlan;
   goalSet: boolean;
+  examDate: string | null;
   done: string[];
   onToggle: (id: string) => void;
   onNavigate: (r: Route) => void;
@@ -276,6 +281,11 @@ function TodayPlanCard({
         {plan.goalTitle && (
           <span className="rounded-lg bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">{plan.goalTitle}</span>
         )}
+        {examDate && plan.daysLeft !== null && plan.daysLeft > 0 && (
+          <span className="rounded-lg bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
+            {formatJalaliLong(examDate)}
+          </span>
+        )}
         {plan.daysLeft !== null && (
           <span
             className={cn(
@@ -286,8 +296,18 @@ function TodayPlanCard({
             {plan.daysLeft === 0 ? "آزمون نزدیک است!" : `${faNum(plan.daysLeft)} روز مانده`}
           </span>
         )}
-        <span className="mr-auto text-[11px] font-bold text-muted-foreground">
-          {faNum(doneCount)}/{faNum(plan.items.length)}
+        <span className="mr-auto flex items-center gap-1.5">
+          <button
+            onClick={onPickGoal}
+            aria-label="ویرایش هدف و تاریخ آزمون"
+            title="ویرایش هدف و تاریخ آزمون"
+            className="grid h-7 w-7 place-items-center rounded-lg bg-muted text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+          <span className="text-[11px] font-bold text-muted-foreground">
+            {faNum(doneCount)}/{faNum(plan.items.length)}
+          </span>
         </span>
       </div>
       <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-muted">
@@ -365,10 +385,11 @@ export function HomeView({ data, navigate }: {  data: AppData;
         </div>
       </section>
 
-      {/* Today's study plan — goal-driven daily checklist (v1.3) */}
+      {/* Today's study plan — goal-driven daily checklist (v1.4 sessions) */}
       <TodayPlanCard
         plan={plan}
         goalSet={!!studyGoal.goal}
+        examDate={studyGoal.examDate}
         done={doneToday}
         onToggle={togglePlanItem}
         onNavigate={navigate}

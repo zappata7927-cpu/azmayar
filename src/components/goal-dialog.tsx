@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { BadgeCheck, CalendarDays } from "lucide-react";
+import { BadgeCheck, CalendarDays, ChevronDown } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { GOALS } from "@/lib/study-plan";
 import { useAppStore, type StudyGoalKey } from "@/lib/store";
 import { cn } from "@/lib/utils";
+import { formatJalaliLong } from "@/lib/jalali";
+import { JalaliCalendar } from "@/components/jalali-calendar";
 import { tapHaptic } from "@/lib/haptics";
 import { toast } from "sonner";
 
@@ -28,7 +30,8 @@ function GoalPicker({ onDone }: { onDone: () => void }) {
   const studyGoal = useAppStore((s) => s.studyGoal);
   const setStudyGoal = useAppStore((s) => s.setStudyGoal);
   const [sel, setSel] = useState<StudyGoalKey | null>(studyGoal.goal);
-  const [date, setDate] = useState(studyGoal.examDate ?? "");
+  const [date, setDate] = useState<string | null>(studyGoal.examDate);
+  const [calOpen, setCalOpen] = useState(false);
   const goal = GOALS.find((g) => g.key === sel);
 
   const save = () => {
@@ -65,17 +68,32 @@ function GoalPicker({ onDone }: { onDone: () => void }) {
       ))}
 
       {goal?.examDate && (
-        <label className="flex items-center gap-2 rounded-2xl border p-3">
-          <CalendarDays className="h-4 w-4 shrink-0 text-primary" />
-          <span className="shrink-0 text-xs font-semibold">تاریخ آزمون (اختیاری)</span>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            dir="ltr"
-            className="min-w-0 flex-1 rounded-lg border bg-muted/50 px-2 py-1.5 text-xs"
-          />
-        </label>
+        <div>
+          <button
+            onClick={() => {
+              void tapHaptic();
+              setCalOpen((v) => !v);
+            }}
+            className={cn(
+              "flex w-full items-center gap-2 rounded-2xl border p-3 transition-colors",
+              calOpen ? "border-primary bg-primary/5" : "border-border"
+            )}
+          >
+            <CalendarDays className="h-4 w-4 shrink-0 text-primary" />
+            <span className="min-w-0 flex-1 text-right">
+              <span className="block text-xs font-semibold">تاریخ آزمون (اختیاری)</span>
+              <span className={cn("block text-[12px] font-bold", date ? "text-primary" : "text-muted-foreground")}>
+                {date ? formatJalaliLong(date) : "برای شمارش معکوس انتخاب کنید"}
+              </span>
+            </span>
+            <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", calOpen && "rotate-180")} />
+          </button>
+          {calOpen && (
+            <div className="slide-up mt-2">
+              <JalaliCalendar value={date} onChange={(iso) => setDate(iso)} />
+            </div>
+          )}
+        </div>
       )}
 
       <button

@@ -113,3 +113,9 @@ export function quizCountsFor(data: AppData): Record<string, number> {
   for (const q of data.questions) out[q.cat] = (out[q.cat] ?? 0) + 1;
   return out;
 }
+
+/** Shuffle the option order of a batch of questions (seeded; cross-reference-safe). */
+export function randomizeOptions(questions: Question[], seed: number): Question[] {
+  const rng = mulberry(seed ^ 0x9e3779b9);
+  return questions.map((q) => shuffleQuestionOptions(q, rng));
+}
