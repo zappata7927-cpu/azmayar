@@ -7,6 +7,8 @@ import type { AppData, Question } from "@/lib/types";
 import type { Route } from "@/lib/nav";
 import { useAppStore, type QuizRun } from "@/lib/store";
 import { buildQuiz, quizCountsFor, type QuizMode, type QuizSession } from "@/lib/quiz";
+import { QUIZ_TICK_PCT, matchingPlanIds } from "@/lib/study-plan";
+import { Celebration } from "@/components/celebration";
 import { faNum, cn } from "@/lib/utils";
 import { tapHaptic } from "@/lib/haptics";
 import { toast } from "sonner";
@@ -352,11 +354,11 @@ function QuizHistoryCard({ runs }: { runs: QuizRun[] }) {
 }
 
 export function QuizView({ data, navigate, route }: { data: AppData; navigate: (r: Route) => void; route: Route }) {
-  const { quizHistory, addQuizRun, mistakes, addMistake, removeMistake, answerQuestion, read } = useAppStore();
+  const { quizHistory, addQuizRun, mistakes, addMistake, removeMistake, answerQuestion, read, leitner, qstats, settings, studyGoal, completePlanItem } = useAppStore();
   // deep-link entry (from the today-plan card): build the session synchronously on
   // first render so a plan item like «۱۰ سؤال بانک خون» opens the quiz immediately
-  const [bootstrap] = useState(() => {
-    if (route.v !== "quiz") return null;
+  const [boot] = useState(() => {
+    if (route.v !== "quiz") return { session: null as QuizSession | null, mode: null as QuizMode | null };
     let mode: QuizMode | null = null;
     let n = 10;
     if (route.mode === "mistakes") mode = { kind: "mistakes" };
@@ -364,16 +366,18 @@ export function QuizView({ data, navigate, route }: { data: AppData; navigate: (
       mode = { kind: "adaptive", cat: route.cat };
       if (route.count) n = route.count;
     }
-    if (!mode) return null;
+    if (!mode) return { session: null, mode: null };
     try {
       const s = buildQuiz(data, mode, n, false);
-      return s.questions.length ? s : null;
+      return { session: s.questions.length ? s : null, mode };
     } catch {
-      return null;
+      return { session: null, mode };
     }
   });
-  const [phase, setPhase] = useState<Phase>(bootstrap ? "run" : "setup");
-  const [session, setSession] = useState<QuizSession | null>(bootstrap);
+  const [phase, setPhase] = useState<Phase>(boot.session ? "run" : "setup");
+  // the quiz mode this session was started with (drives the plan auto-tick mapping)
+  const [lastMode, setLastMode] = useState<QuizMode | null>(boot.mode);
+  const [session, setSession] = useState<QuizSession | null>(boot.session);
   const [pos, setPos] = useState(0);
   const [picked, setPicked] = useState<number | null>(null);
   const [score, setScore] = useState(0);
@@ -412,6 +416,7 @@ export function QuizView({ data, navigate, route }: { data: AppData; navigate: (
       }
       return;
     }
+    setLastMode(mode);
     setSession(s);
     setPhase("run");
     setPos(0);
@@ -442,6 +447,24 @@ export function QuizView({ data, navigate, route }: { data: AppData; navigate: (
     if (pos + 1 >= session.questions.length) {
       const finalScore = score;
       addQuizRun({ at: Date.now(), score: finalScore, total: session.questions.length, label: session.label });
+      // auto-tick the today-plan quiz batches this session covered (v1.6.1):
+      // map by the tids of the questions actually answered — a mistakes review
+      // maps to the mistakes item. This is the missing piece: the smart /
+      // comprehensive / category quizzes used to tick nothing at all.
+      const pct = Math.round((finalScore / Math.max(session.questions.length, 1)) * 100);
+      const kind = lastMode?.kind === "mistakes" ? ("mistakes" as const) : ("quiz" as const);
+      const tids = new Set<string>(session.questions.map((q) => q.tid).filter((t): t is string => !!t));
+      const planIds = matchingPlanIds(data, { leitner, qstats, mistakes, settings, studyGoal }, kind, tids);
+      if (pct >= QUIZ_TICK_PCT && planIds.length) {
+        planIds.forEach(completePlanItem);
+        toast.success(
+          kind === "mistakes"
+            ? `دقت ${faNum(pct)}٪ — مرور اشتباهات در برنامه امروز تیک خورد ✓`
+            : planIds.length > 1
+              ? `دقت ${faNum(pct)}٪ — ${faNum(planIds.length)} دسته آزمون در برنامه امروز تیک خورد ✓`
+              : `دقت ${faNum(pct)}٪ — دسته سؤال‌ها در برنامه امروز تیک خورد ✓`
+        );
+      }
       setPhase("result");
       return;
     }
@@ -579,6 +602,7 @@ export function QuizView({ data, navigate, route }: { data: AppData; navigate: (
     const Icon = msg.i;
     return (
       <div className="space-y-5">
+        {pct === 100 && <Celebration />}
         <div className="rounded-3xl border bg-card p-6 text-center shadow-md">
           <Icon className={cn("mx-auto h-10 w-10", msg.c)} />
           <p className="mt-2 text-lg font-black">{msg.t}</p>

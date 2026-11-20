@@ -241,3 +241,123 @@
     opacity: 1;
   }
 }
+
+/* ---------- perfect-score celebration (v1.6.1) ---------- */
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(-8vh) rotate(0deg) rotateY(0deg);
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(108vh) rotate(var(--rot, 180deg)) rotateY(540deg);
+    opacity: 0.9;
+  }
+}
+.confetti-piece {
+  animation-name: confetti-fall;
+  animation-timing-function: ease-in;
+  animation-fill-mode: both;
+}
+
+@keyframes celebrate-pop-in {
+  0% {
+    transform: scale(0.2);
+    opacity: 0;
+  }
+  55% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+  75% {
+    transform: scale(0.96);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+.celebrate-pop {
+  animation: celebrate-pop-in 0.7s cubic-bezier(0.22, 1.4, 0.36, 1) both;
+}
+
+@keyframes celebrate-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
+}
+.celebrate-star {
+  animation: celebrate-pulse 1.1s ease-in-out 0.7s infinite;
+}
+.celebrate-glow {
+  animation: celebrate-pulse 2.2s ease-in-out infinite;
+}
+
+@keyframes celebrate-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.celebrate-rays {
+  animation: celebrate-spin 7s linear infinite;
+}
+
+@keyframes celebrate-blink {
+  0%,
+  92%,
+  100% {
+    transform: scaleY(1);
+  }
+  95% {
+    transform: scaleY(0.12);
+  }
+}
+.celebrate-eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: celebrate-blink 3.2s ease-in-out 1s infinite;
+}
+
+@keyframes celebrate-smile-draw {
+  from {
+    stroke-dashoffset: 30;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.celebrate-smile {
+  stroke-dasharray: 30;
+  animation: celebrate-smile-draw 0.8s ease-out 0.5s both;
+}
+
+@keyframes celebrate-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+.celebrate-overlay {
+  animation: celebrate-fade-out 0.45s ease-in 3.9s both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .confetti-piece,
+  .celebrate-pop,
+  .celebrate-star,
+  .celebrate-glow,
+  .celebrate-rays,
+  .celebrate-eye,
+  .celebrate-smile,
+  .celebrate-overlay {
+    animation: none;
+    opacity: 1;
+  }
+}

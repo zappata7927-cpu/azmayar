@@ -228,3 +228,26 @@ export function buildTodayPlan(
   }
   return { items, daysLeft, goalTitle: goal?.title ?? null, note };
 }
+
+/** minimum quiz accuracy for a today-plan item to auto-tick (v1.6) */
+export const QUIZ_TICK_PCT = 60;
+
+type PlanOpts = Parameters<typeof buildTodayPlan>[1];
+
+/** Which today-plan items a finished session satisfies (v1.6.1). A session can
+ *  be launched from outside the plan (test page, smart/comprehensive/category
+ *  quiz), so the auto-tick maps by CONTENT: same-kind plan items whose test is
+ *  among the tids the session actually covered. A mistakes review maps to the
+ *  mistakes item. Rebuilding the plan here keeps the mapping true to what the
+ *  user currently sees on the home page. */
+export function matchingPlanIds(
+  data: AppData,
+  opts: PlanOpts,
+  kind: "cards" | "quiz" | "mistakes",
+  tids: Set<string>
+): string[] {
+  const plan = buildTodayPlan(data, opts);
+  return plan.items
+    .filter((i) => i.kind === kind && (kind === "mistakes" || (!!i.tid && tids.has(i.tid))))
+    .map((i) => i.id);
+}

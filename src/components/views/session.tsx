@@ -22,12 +22,12 @@ import type { Route } from "@/lib/nav";
 import { useAppStore } from "@/lib/store";
 import { categoryPerformance, pickAdaptiveQuestions } from "@/lib/adaptive";
 import { randomizeOptions } from "@/lib/quiz";
+import { QUIZ_TICK_PCT, matchingPlanIds } from "@/lib/study-plan";
+import { Celebration } from "@/components/celebration";
 import { faNum, cn } from "@/lib/utils";
 import { tapHaptic } from "@/lib/haptics";
 
 const QUESTION_SECONDS = 60;
-/** minimum quiz accuracy for the today-plan item to auto-tick (v1.6) */
-const QUIZ_TICK_PCT = 60;
 const OPTION_LETTERS = ["الف", "ب", "ج", "د", "ه", "و"];
 
 const safeAnswer = (q: Question) =>
@@ -54,7 +54,7 @@ interface SessionBoot {
  * ending with a full per-question کارنامه.
  */
 export function SessionView({ data, navigate, route }: { data: AppData; navigate: (r: Route) => void; route: Route }) {
-  const { leitner, answerCard, answerQuestion, addMistake, removeMistake, qstats, mistakes, addQuizRun, completePlanItem } = useAppStore();
+  const { leitner, answerCard, answerQuestion, addMistake, removeMistake, qstats, mistakes, settings, studyGoal, addQuizRun, completePlanItem } = useAppStore();
 
   const [boot] = useState(() => {
     if (route.v !== "session") return null;
@@ -113,21 +113,28 @@ export function SessionView({ data, navigate, route }: { data: AppData; navigate
 
   const finish = useCallback(() => {
     if (!boot) return;
+    // which today-plan items does this session satisfy? the session can be
+    // opened from the plan, a test page or elsewhere — map by the tids the
+    // session actually covered, against the plan the user sees right now (v1.6.1)
+    const tids = new Set<string>(
+      (boot.kind === "cards" ? boot.cards.map((c) => c.tid) : boot.questions.map((q) => q.tid)).filter((t): t is string => !!t)
+    );
+    const planIds = matchingPlanIds(data, { leitner, qstats, mistakes, settings, studyGoal }, boot.kind, tids);
     if (boot.kind === "cards") {
-      completePlanItem(boot.planId);
-      toast.success("جلسه مرور تمام شد — در برنامه امروز تیک خورد ✓");
+      planIds.forEach(completePlanItem);
+      toast.success(planIds.length ? "جلسه مرور تمام شد — در برنامه امروز تیک خورد ✓" : "جلسه مرور تمام شد ✓");
     } else {
       addQuizRun({ at: Date.now(), score, total: boot.questions.length, label: boot.label });
       const pct = Math.round((score / Math.max(boot.questions.length, 1)) * 100);
       if (pct >= QUIZ_TICK_PCT) {
-        completePlanItem(boot.planId);
-        toast.success(`دقت ${faNum(pct)}٪ — دسته سؤال‌ها در برنامه امروز تیک خورد ✓`);
+        planIds.forEach(completePlanItem);
+        toast.success(planIds.length ? `دقت ${faNum(pct)}٪ — دسته سؤال‌ها در برنامه امروز تیک خورد ✓` : `دقت ${faNum(pct)}٪ — آفرین! ✓`);
       } else {
         toast.warning(`دقت ${faNum(pct)}٪ — برای تیک خودکار، حداقل ${faNum(QUIZ_TICK_PCT)}٪ لازم است`);
       }
     }
     setPhase("done");
-  }, [boot, score, completePlanItem, addQuizRun]);
+  }, [boot, score, data, leitner, qstats, mistakes, settings, studyGoal, completePlanItem, addQuizRun]);
 
   const advance = useCallback(
     (fromPos: number) => {
@@ -408,6 +415,7 @@ export function SessionView({ data, navigate, route }: { data: AppData; navigate
 
   return (
     <div className="space-y-5">
+      {isQuizDone && pct === 100 && <Celebration />}
       <div className="rounded-3xl border bg-card p-6 text-center shadow-md">
         <PartyPopper className={cn("mx-auto h-9 w-9", msg.c)} />
         <p className="mt-2 text-lg font-black">{isQuizDone ? "کارنامه جلسه" : "جلسه مرور تمام شد"}</p>
