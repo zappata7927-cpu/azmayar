@@ -1,5 +1,5 @@
 /* Service worker for the Azmayar PWA — network-first with offline cache fallback. */
-const VERSION = "azmayar-v16";
+const VERSION = "azmayar-v17";
 const CORE = [
   "./",
   "./index.html",
